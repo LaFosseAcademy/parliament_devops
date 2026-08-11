@@ -1,0 +1,252 @@
+# End-to-End DevOps Deployment Challenge
+
+A 2-day capstone. No new lecture content today — this is where everything from Linux, Git, Docker, Terraform, Azure, Kubernetes, and Jenkins gets applied, independently, to an application of your own choosing.
+
+## Organisation
+
+### Duration
+
+2 days, **09:30 - 17:00** each day. This is deliberately less structured than previous sessions — students work independently or in pairs, with trainers acting as **mentors and reviewers** rather than lecturing from the front.
+
+| Day | Focus |
+|---|---|
+| Day 1 | Choose your application, containerise it, provision infrastructure, get it manually deployed |
+| Day 2 | Automate the whole thing with Jenkins, harden it, and demo it to the group |
+
+### Set-up
+
+#### For Trainers
+
+This session runs differently to the rest of the course — plan your day as a **facilitator**, not a lecturer.
+
+- **Prepare** a short kickoff (15 min max) covering the brief, the checkpoints, and the support model — everything after that is roaming, reviewing, and unblocking
+- **Schedule** yourself around the four checkpoints below so you're free to check in with each student/pair as they hit them, rather than at fixed lecture times
+- **Prepare** a shared space (a channel, a whiteboard, a shared doc) for students to log where they're stuck — this makes it much easier to spot common blockers early and address them once to the whole room, rather than repeating the same fix one-to-one
+- **Have example applications ready** (see below) for anyone who arrives without a project of their own
+- **Book time** at the end of Day 2 for the showcase — this matters more than it might seem; presenting their own work is a big part of the learning here
+
+**Optional Slidee slide** for the kickoff only: <br>
+`Weeks X Y > CDO > End-to-End Deployment Challenge` — just the brief and checkpoint timings, nothing more.
+
+#### For Students
+- **Direct** students to the starter code for this module
+  - [Student Facing Repo](https://github.com/LaFosseAcademy/cloud-devops-student-repos/tree/main)
+- **Use**
+  - **/end-to-end-challenge/starter-code** — contains the example applications below, plus a blank project template with a suggested folder structure (not mandatory to use)
+- **Make sure** everyone has, before Day 1 starts:
+  - A GitHub account and the ability to create a new repository
+  - Docker installed and running
+  - A Docker Hub account (or access to Azure Container Registry, if preferred)
+  - An Azure subscription with a Service Principal ready to go (from the Terraform/Azure sessions)
+  - A working Jenkins instance (their own from the Jenkins day, or a shared one provided by the trainer)
+  - **Chosen an application** — see below
+
+## Learning objectives
+
+- **Apply** Linux, Git, Docker, Terraform, Azure, and Jenkins together on one real project, independently
+- **Design and justify** your own architecture and toolchain decisions, rather than following a prescribed path
+- **Produce** a working, automated deployment pipeline — from `git push` to a live, reachable application
+- **Practice** troubleshooting across the full stack without step-by-step instructions
+- **Present** and demonstrate a finished solution clearly to peers
+
+<br>
+
+---
+
+## The Brief
+
+Take an application — ideally one already packaged as, or easily packaged as, a **Docker image** — and get it running in Azure, deployed and updated entirely through an automated pipeline you build yourself.
+
+By the end of Day 2, you should be able to:
+1. Push a code change to `main`
+2. Watch a Jenkins pipeline pick it up automatically
+3. See that change reflected in a live, publicly reachable application running in Azure
+4. Explain, to someone else, exactly how every part of that chain works
+
+**How you get there is largely up to you.** This brief gives you checkpoints and guardrails, not a script. Where earlier sessions showed you one way to do something, you're free to make different choices here — that's the point.
+
+### Choosing your application
+
+Options, roughly in order of how much extra setup they need:
+
+* **Bring your own** — any small-to-medium application you've already built, in any language, is fair game. If it isn't containerised yet, writing the `Dockerfile` is part of Day 1.
+* **`lfacademy/hello-world-rest-api`** — the image we've used all course. Simple, already a working Docker image, lets you focus entirely on infrastructure and pipeline rather than application code.
+* **A small starter app from the module repo** — a couple of minimal Flask/Node "to-do list" style apps are provided in `/end-to-end-challenge/starter-code/example-apps` for anyone who wants something with a *little* more surface area than a hello-world endpoint, without needing to write an app from scratch.
+
+**NOTE FOR TRAINERS** <br>
+Actively encourage students who have *any* side project, however rough, to use it. The engagement difference between "deploying my own thing" and "deploying the same demo app everyone else has" is significant, and debugging a real, slightly messy codebase is closer to real DevOps work than a pre-cleaned example ever will be. <br>
+**END OF NOTE**
+
+### Choosing your infrastructure target
+
+This is a genuinely open decision, and part of the challenge is making it deliberately rather than defaulting to whatever's most familiar:
+
+* **A single Azure VM running Docker** — closest to the resource-provisioning sessions; simplest to reason about; no orchestration
+* **Azure Kubernetes Service (AKS)** — more moving parts, but you already know the primitives (Deployments, Services); gives you easy scaling and self-healing "for free"
+
+There's no wrong answer here. If you choose the VM route, be ready to explain in your demo *why* — "it's simpler and this app doesn't need to scale" is a perfectly good answer, and better than defaulting to Kubernetes because it's the newest thing you learned.
+
+<br>
+
+---
+
+## Day 1: Foundations
+### 09:30 - 17:00
+
+### Morning: Kickoff, containerise, and get it running locally
+
+* Confirm your application choice and, if working in a pair, agree who's driving first
+* If your app isn't containerised yet, write a `Dockerfile` and get `docker build` / `docker run` working **locally** before touching anything in the cloud
+* Create a **new GitHub repository** for this project (a fresh repo, not a fork this time) and push your app + Dockerfile
+* Push a working image to Docker Hub (or ACR) by hand, once, just to confirm the whole chain works before we automate any of it
+
+**Stuck?** <br>
+If you're not sure your `Dockerfile` is right, `docker run -p <port>:<port> <your-image>` and hit it with `curl localhost:<port>` before doing anything else — don't debug in the cloud what you haven't first confirmed locally.
+
+### ✅ Checkpoint 1 — around midday
+Show a trainer:
+- [ ] A GitHub repo containing your application and a working `Dockerfile`
+- [ ] A Docker image, built from that `Dockerfile`, pushed to Docker Hub or ACR
+- [ ] The app running locally via `docker run`, responding to a request
+
+<br>
+
+### Afternoon: Provision infrastructure and deploy — by hand, once
+
+Using Terraform, provision whatever your chosen target needs:
+
+* **VM route**: Resource Group, Virtual Network/Subnet, Network Security Group (with the ports your app actually needs open), Public IP, and the VM itself
+* **AKS route**: Resource Group and an AKS cluster
+
+Run `terraform plan` and `terraform apply` **from your own machine** today — we're not automating this yet, we're proving it works.
+
+Once the infrastructure exists, get your container running on it **manually**:
+* VM route: SSH in, `docker pull` your image, `docker run` it, confirm you can reach it over the public IP
+* AKS route: `kubectl create deployment` / `kubectl expose`, or a first-pass YAML file, confirm you can reach it via the Service's external IP
+
+**Stuck?** <br>
+If your app isn't reachable, work through the layers in order: is the container actually running (`docker ps` / `kubectl get pods`)? Is it listening on the port you think it is? Does your NSG (or Kubernetes Service) actually allow traffic on that port from the internet? This is the same layered debugging approach from the Linux and Automation session — check the smallest thing first.
+
+### ✅ Checkpoint 2 — end of Day 1
+Show a trainer:
+- [ ] `terraform apply` has been run successfully and the infrastructure exists in Azure
+- [ ] Your `.tf` files are committed to your GitHub repo
+- [ ] Your application is reachable at a public IP or URL, deployed manually
+- [ ] You can explain, out loud, every resource your Terraform config creates and why it's needed
+
+**NOTE FOR TRAINERS** <br>
+This is the natural point for anyone significantly behind to get pulled aside for a short catch-up rather than starting Day 2 already lost — better to lose 20 minutes here than have someone stuck for the whole of tomorrow. <br>
+**END OF NOTE**
+
+<br>
+
+---
+
+## Day 2: Automate, Harden, and Demo
+### 09:30 - 17:00
+
+### Morning: Build the Jenkins pipeline
+
+This is where yesterday's manual steps become automatic. Write a `Jenkinsfile`, committed to your repo, that on every push to `main`:
+
+1. Checks out the code
+2. Builds the Docker image
+3. Pushes it to Docker Hub/ACR, tagged with the build number
+4. Runs `terraform init` and `terraform plan` against your infrastructure
+5. **Gates on approval** before applying (an `input` step, same as the Toolchain Integration session)
+6. Runs `terraform apply`
+7. Deploys the new image version (this last step will look different depending on your infrastructure choice — think about what actually needs to happen: a fresh `docker run` on the VM? A `kubectl set image`? A Terraform-managed resource that references the new tag directly?)
+
+Wire up the GitHub webhook so this triggers on push, not just on a manual **Build Now**.
+
+**Stuck?** <br>
+Build this pipeline stage by stage, exactly like we did in the Jenkins and Toolchain Integration sessions — get `Checkout` working and passing before adding `Build`, get `Build` passing before adding `Push`, and so on. A pipeline with five stages you built and tested one at a time is far easier to debug than one written all at once.
+
+### ✅ Checkpoint 3 — around midday
+Show a trainer:
+- [ ] A full pipeline run, triggered by a real `git push`, not a manual build
+- [ ] Every stage passing, including the approval gate and `terraform apply`
+- [ ] The new version of the application actually live and reachable after the pipeline finishes
+
+<br>
+
+### Afternoon: Harden, review, and prepare to demo
+
+With the core loop working, spend the afternoon on whichever of these will teach you the most — you don't need to do all of them:
+
+* **Resilience**: what happens if the container crashes? (VM: a restart policy on `docker run`; AKS: this is close to free, but confirm it actually works by killing a pod)
+* **Config/secrets hygiene**: is anything sensitive hardcoded anywhere it shouldn't be — in the `Jenkinsfile`, in a `.tf` file, in the app itself?
+* **A second environment**: could your Terraform config be parameterised (a `variable` for environment name, as we covered in the Terraform sessions) to stand up a second, separate `staging` copy?
+* **Observability**: can you actually tell, from outside, whether your app is healthy right now? A basic health check endpoint, or `kubectl get pods` / `docker ps` as a manual check, both count
+
+**Peer review, mid-afternoon**: <br>
+Pair up with someone who chose a different infrastructure target than you (VM ↔ AKS where possible). Look at each other's repo and pipeline for 15 minutes each. You're not looking for perfection — you're looking for one thing you'd do differently, and one thing you'll steal for your own next project.
+
+### ✅ Checkpoint 4 — mid-to-late afternoon
+- [ ] At least one hardening improvement made and demonstrated
+- [ ] Peer review completed both ways
+- [ ] A one-paragraph explanation ready of the single hardest problem you solved across the two days
+
+<br>
+
+### Final Showcase — last hour of Day 2
+
+Each student or pair gets **5 minutes**:
+1. A 30-second architecture summary (what's running, where)
+2. A live demo: make a small change, push it, and let the group watch the pipeline run
+3. One thing that went wrong along the way, and how you fixed it
+
+**NOTE FOR TRAINERS** <br>
+The "what went wrong and how you fixed it" part is deliberately part of the brief, not optional colour — it normalises debugging as a core, expected part of the work, and it's often the most useful five minutes for the rest of the room, since chances are several people hit the exact same issue. <br>
+**END OF NOTE**
+
+<br>
+
+---
+
+## Success Criteria
+
+| Requirement | Evidence |
+|---|---|
+| Application is containerised | `Dockerfile` in the repo, image pushed to a registry |
+| Infrastructure is defined as code | `.tf` files in the repo, `terraform apply` runs cleanly |
+| Deployment is automated | `Jenkinsfile` in the repo, triggered by a real `git push` |
+| Secrets are handled properly | No credentials committed to Git — Jenkins Credentials store used throughout |
+| A human reviews before infrastructure changes apply | A working `input`/approval gate in the pipeline |
+| The application is genuinely reachable | A live public IP or URL, demoed working on the day |
+| You can explain your own architecture | Verbal walkthrough during the showcase, without notes |
+
+This isn't a pass/fail checklist marked in isolation — it's what a trainer will be looking for while checking in at each checkpoint, and what you should be able to point to by the final showcase.
+
+<br>
+
+---
+
+## Stretch Goals
+
+If you finish early, or want to push further on Day 2, pick from:
+
+* **Blue/green or canary-style deployment** — route traffic to a new version gradually rather than all at once
+* **Split `plan`/`apply` on PRs vs merges** — exactly the pattern discussed (but not fully built) in the Toolchain Integration session: `terraform plan` posted as a PR comment, `apply` only on merge to `main`
+* **Automated tests as a pipeline stage** — a real test suite, not just `echo 'Running tests...'`, gating the build before it ever reaches `Build Docker Image`
+* **A custom domain with HTTPS** — point a domain at your application and get a TLS certificate issued (Let's Encrypt, or Azure's own certificate options)
+* **Move from VM to AKS, or vice versa** — if time allows, rebuilding on the other infrastructure target is one of the best ways to see the trade-offs for yourself rather than just being told about them
+* **Monitoring/alerting** — Azure Monitor, or even a simple scheduled health-check script (cron, from the Linux and Automation session) that alerts if the app stops responding
+
+<br>
+
+---
+
+## Conclusion
+
+- **Inform** students this marks the end of the taught programme's core capstone — everything from here builds on what's been demonstrated today
+- **Run** the final showcase as a group activity, not a private trainer review — the cross-pollination of seeing different valid approaches to the same brief is a significant part of the value
+- **Collect** a short written retrospective from each student/pair: what they'd do differently, and what they're proudest of
+- **Direct** students towards the stretch goals as self-directed follow-up work if they want to keep building after the course ends
+
+---
+
+[Back](./README.md)
+
+---
+
