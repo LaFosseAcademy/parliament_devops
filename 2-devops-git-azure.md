@@ -178,6 +178,36 @@ Let's spend a few minutes just orienting ourselves in [portal.azure.com](https:/
 * **All resources** — every resource across every resource group you can see
 * **Cost Management + Billing** — where the bill actually lives; worth a glance so students know it exists before their free trial credit vanishes unexpectedly
 
+When we started this session, I mentioned one of the benefits of using the cloud was not having any upfront costs. 
+
+That benefit becomes redundant if we spend too much money in Azure. If we have a solution for an issue at PDS but it costs 100 million pounds, then it's not a good solution, so the cost of things is something we need to be conscious of. 
+
+On the left hand side we should be a drop down menu of **Cost management**, if we open that you'll see **Budgets**.
+
+**HANDS ON** <br>
+One of the most important things you'll need to learn is being independent. Over the next year or so they'll be a lot of information you'll need to learn and you want necessarily have someone there to walk you through it. 
+
+We're going to start off relatively easy, I just want you to create a budget. More importantly, as you go I just want you to explore and read through the different options available to us. 
+
+**AFTER 5 MINS DO YOURSELF**
+
+One of the things you may have seen is the ability to add **Filters**
+
+We've got:
+- **Resource Group Name** - only give us the budget on resources contained in a specific group
+- **Resource ID** - specific individual resources in Azure, may a VM or a DB
+- **Subscription ID** - for a specific subscription
+- **Service name** - looking at a specific service
+  - not something we've looked at specifically but Azure, AWS and Google Cloud all other lots of different services for the different resources we can access. So if we wanted to we can have a filter specifically for services relating to
+- **ResourceLocation** - where the resource is
+
+Lots of different ways we can assess how much something is costing us. 
+
+In your roles you wont be setting the department budget, nor how much of that budget you can spend. But monitoring the spend through budgets and investigating any unexpected increases in cost is definitely your responsibility. 
+
+
+# START
+
 Let's create something by hand, the way we might if we were just getting started with Azure and hadn't heard of Terraform yet.
 
 * Search **Resource groups** > **Create**
