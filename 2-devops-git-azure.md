@@ -110,7 +110,7 @@ All these different products are compatible with Azure.
 Azure organises everything you own into a hierarchy. Understanding this now will save a lot of confusion once we start writing Terraform.
 
 *REFER TO RESOURCE 2 - SLIDEE* <br>
-![azure-fundamentals-1](./slidee/images/azure_hierachy.png)
+![azure-fundamentals-1](../slidee/images/azure_hierachy.png)
 
 From the top down:
 
