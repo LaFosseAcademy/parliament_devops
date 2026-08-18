@@ -221,12 +221,30 @@ That took maybe 30 seconds. Quick, easy, and — as we'll get to shortly — exa
 Remember the graph I showed you at the beginning of the day, we have our: **Tenant** then **Subscription** followed by a **Resource Group**, once we've done that we can provision **Resources**
 
 
-# START
-
 <br>
 <br>
 
 ### The Azure CLI
+
+#### Download
+
+Let's move to another way we can interact with Azure. We've been using the GUI, we can also use the CLI
+
+- **Windows**: https://community.chocolatey.org/packages/azure-cli
+- **Mac**: https://formulae.brew.sh/formula/azure-cli
+
+Run: `az --version` to check you've installed properly. 
+
+You might get the pure cli version. 
+
+What I'm seeing in addition are the CLI itself plus the internal components and the Python packages it relies on as well. 
+
+The **core** is parsing the core commands, authentication, configuration. <br>
+And **telemetry** is information about how the CLI is being used, error information etc.. which can be updated separately. 
+
+Not too important but just to explain the difference if you're curious. 
+
+# START
 
 Everything we just did in the browser, we can also do from the terminal using the **Azure CLI**.
 
