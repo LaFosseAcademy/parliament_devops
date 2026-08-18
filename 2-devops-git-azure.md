@@ -115,14 +115,21 @@ Azure organises everything you own into a hierarchy. Understanding this now will
 From the top down:
 
 * **Tenant**: your organisation's identity in **Azure AD** (Azure Active Directory). Almost always one tenant per organisation. Every user, group, and application registration lives inside a tenant.
-* **Subscription**: a billing and access boundary *inside* a tenant. A single tenant can hold multiple subscriptions — commonly one per environment (`Dev`, `Test`, `Prod`) or one per business unit.
+* **Subscription**: a billing and access boundary *inside* a tenant. A single tenant can hold multiple subscriptions — commonly one per environment (`Dev`, `Test`, `Prod`) or one per business unit (IT, HR, Operations). 
 * **Resource Group**: this is a logical container inside a subscription that groups related resources sharing a lifecycle — imagine we have an application and we need a Virtual Machine, a Database and the ability to Monitor those resources. They'd all be attached to the same Resource Group.
 * **Resource**: the actual thing being managed — a Virtual Machine, a Storage Account, a Virtual Network, and so on.
 
 **ASK** <br>
 Why might an organisation want several subscriptions, rather than just using more resource groups inside one big subscription? <br>
 **ANSWER** <br>
-Cleaner cost separation on the bill, harder access-control boundaries (someone with access to the `Dev` subscription doesn't automatically get anywhere near `Prod`), separate quotas/limits, and it limits the "blast radius" if something goes badly wrong in one environment.
+- Cleaner cost separation on the bill:
+  - Easy to see if one department or environment has an unusually large bill
+  - Often different departments have different budgets
+- harder access-control boundaries
+  - someone with access to the `Dev` subscription doesn't automatically get anywhere near `Prod`)
+- separate quotas/limits, and it limits the "blast radius" if something goes badly wrong in one environment.
+  - when we think about quotas, we can have a `Test` environment where we limit the time a VM can run to 48 hours because all of our tests should execute in that time and we don't want to spend money accidentally. In a production environment that would be problematic.
+  - when I said **blast radius** this is probably more important. We could have scripts which we write which basically delete all resources. If every resource exists on one subscription then we could unintentionally delete everything accidentally. 
 
 Let's look at this live. In the [Azure Portal](https://portal.azure.com), search for **Subscriptions**.
 
