@@ -133,12 +133,14 @@ Why might an organisation want several subscriptions, rather than just using mor
 
 Let's look at this live. In the [Azure Portal](https://portal.azure.com), search for **Subscriptions**.
 
-I'm signed in as **emilesherrott_dev**, on the **Pay-As-You-Go** subscription, inside a tenant with **Tenant ID**: `9f4b1c2a-3d5e-4a6b-8c7d-1e2f3a4b5c6d`.
+I'm signed in via my email address and my subscription is called **Azure subscription 1**, I've got an ID and if I scroll to the right you'll see my **Parent management group** as well. All default values.
 
-![azure-fundamentals-2](./resources/azure-fundamentals-2.png)
 
-**NOTE FOR TRAINERS** <br>
-This is a good moment to have students find and note down their own **Subscription ID** and **Tenant ID** — they'll need both in the next session when we authenticate Terraform. <br>
+![azure-fundamentals-2](./slidee/images/azure_subscription_1.png)
+![azure-fundamentals-2](./slidee/images/azure_subscription_2.png)
+
+**HANDS ON** <br>
+I want to get you to hands on and just explore the **Subscription resource**. If you can just see the information available and also change the name of the subscription to your name and lfa-deep-dive. So for me it'd be `emilesherrott-lfa-deep-dive` <br>
 **END OF NOTE**
 
 <br>
