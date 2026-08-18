@@ -244,22 +244,49 @@ And **telemetry** is information about how the CLI is being used, error informat
 
 Not too important but just to explain the difference if you're curious. 
 
-# START
-
 Everything we just did in the browser, we can also do from the terminal using the **Azure CLI**.
 
 * `az login` — opens a browser to authenticate, same as before
 * `az account show` — see which subscription we're currently working in
+  * Most of these are self explanitory:
+    * `managedByTenants` indicates whether the subscription is associated with external tenants, you can delegate management elsewhere
+    * `state`, essentially, is the subscription active
+    * `tenantDefaultDomain`, we've seen, the default domain associated with the tenant
+    * all the way down to **user**, a JSON object, telling you who the Azure CLI authenticated you as
+   
+      
 * `az account list -o table` — list every subscription we have access to
-* `az account set --subscription "Pay-As-You-Go"` — switch which subscription commands run against
+* `az account set --subscription "Azure subscription 1"` — switch which subscription commands run against
 
-Let's list the resource group we just created:
+Those are some base commands related to our accounts. 
+
+I won't run this one directly but we can also logout with `az logout`, which is always smart if you've finished work for the week. 
+
+More often than not though, we may use the Azure CLI to see what resources we've currently got. 
+
+We saw just now `az account list -o table`. 
+
+Let's do the same thing but instead of checking accounts, let's look into our **resource groups**:
 
 * `az group list -o table`
 
+Seeing this output as a table should be easier than the JSON default, especially when there's lots of resource groups at once. 
+
+Essentially though, when we run our commands from the terminal. Those commands get sent to an **Azure REST API** and the API connects into Azure itself. 
+
+So when I ask to see the resource groups, the CLI sends as part of the request, the resource I'm interested in and most likely information about the Subscription I have. The API goes to Azure, gathers the information and sends a response back.
+
+So what we've done to far is similar to a **GET** request. 
+
+Let's try a **POST** request and create some resources.
+
+
 And create another one, this time from the CLI:
 
-* `az group create --name rg-fundamentals-cli --location uksouth`
+* `az group create --name pds-deep-dive-cli --location uksouth`
+
+It'll take a couple of moments but if you go to your browser, you should see it created. 
+
 
 **ASK** <br>
 What's the practical difference between creating that resource group by clicking through the Portal wizard, versus running that one CLI command? <br>
@@ -268,11 +295,16 @@ The CLI command can be saved in a file, re-run exactly the same way tomorrow, sh
 
 We can inspect what's inside a resource group too:
 
-* `az resource list --resource-group rg-fundamentals-demo -o table`
+* `az resource list --resource-group pds-deep-dive-cli -o table`
 
-**NOTE FOR TRAINERS** <br>
-Don't dwell too long on CLI syntax here — this isn't a CLI deep-dive, it's a stepping stone to show students that everything clickable in the Portal has a scriptable equivalent. That idea is the whole bridge into Infrastructure as Code later in this session. <br>
-**END OF NOTE**
+There's now output right now, we haven't created any resources to exist inside the resource group, but again potentially really interesting information. 
+
+
+We don't need to dwell too long on CLI syntax here — this isn't a CLI deep-dive, it's a stepping stone, essentially to show you that everything clickable in the Portal has a scriptable equivalent. <br>
+
+That idea is the whole bridge into Infrastructure as Code later in the Deep Dive. <br>
+
+# START
 
 <br>
 <br>
