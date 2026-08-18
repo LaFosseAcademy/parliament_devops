@@ -211,14 +211,16 @@ In your roles you wont be setting the department budget, nor how much of that bu
 Let's create something by hand, the way we might if we were just getting started with Azure and hadn't heard of Terraform yet.
 
 * Search **Resource groups** > **Create**
-* **Subscription**: Pay-As-You-Go
-* **Resource group name**: `rg-fundamentals-demo`
+* **Subscription**: *The name of the subscription you changed earlier*
+* **Resource group name**: `pds-deep-dive`
 * **Region**: `UK South`
 * **Review + create** > **Create**
 
-![azure-fundamentals-3](./resources/azure-fundamentals-3.png)
+![azure-fundamentals-2](./slidee/images/azure_resource_group_1.png)
 
 That took maybe 30 seconds. Quick, easy, and — as we'll get to shortly — exactly the kind of thing that becomes a real problem at scale.
+
+Remember the graph I showed you at the beginning of the day, we have our: **Tenant** then **Subscription** followed by a **Resource Group**, once we've done that we can provision **Resources**
 
 <br>
 <br>
