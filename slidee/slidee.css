@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+/* @font-face {
+    font-family: "WorkSansS3";
+    font-weight: 1 1000;
+    src: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/fonts/WorkSans-VariableFont_wght.ttf");
+} */
+
+/* @font-face {
+    font-family: "Funnel Display", sans-serif;
+    font-weight: 1 1000;
+    src: url("https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&display=swap");
+} */
+
+/* @font-face {
+    font-family: "WorkSansItalicS3";
+    font-weight: 1 1000;
+    src: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/fonts/WorkSans-Italic-VariableFont_wght.ttf");
+} */
+
+/* @font-face {
+    font-family: "Montserrat", sans-serif;
+    font-weight: 1 1000;
+    src: url("https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+} */
+
+:root {
+    --dark-purple: #3C2157;
+    --hero-purple: #46006b;
+    --black: #1e1e1e;
+    --white: #ffffff;
+    --lime: #d0e54d;
+    --lemon: #FFC828;
+    --coral: #ff7999;
+    --yellow: #feb101;
+    --r-main-color: #1e1e1e !important;
+
+    --ft-title: "Funnel Display", sans-serif;
+    --ft-body: "Montserrat", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --ft-body-italic: "Montserrat", Helvetica, Arial, sans-serif;
+    --ft-code: "Montserrat", Consolas, Menlo, Courier, monospace;
+    
+    --logo: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/logos/logotype-white.svg");
+    --arrow: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/icons/right-arrow.svg");
+    --angles: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/shapes/angles.svg");
+    --cog: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/shapes/cog.svg");
+    --shield: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/shapes/shield.svg");
+    --star: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/shapes/star.svg");
+    --divider: url("https://futureproof-protected-assets.s3.eu-west-2.amazonaws.com/brand-assets/shapes/divider.svg");
+}
+
+body {
+    background-color: var(--black) !important;
+    color: var(--white) !important;
+    font-weight: 400 !important;
+    letter-spacing: -0.02em;
+}
+
+p,
+h3,
+h4,
+li,
+ol,
+ul {
+    color: var(--white) !important;
+    font-weight: 200 !important;
+}
+
+h1,
+h2 {
+    color: var(--yellow) !important;
+    font-family: var(--ft-title) !important;
+    font-weight: 800 !important;
+    text-transform: none !important;
+}
+
+/* Typography */
+:is(h1, h2) {
+    font-family: var(--ft-title) !important;
+    text-transform: none !important;
+    /* font-size: 1.5em !important; */
+}
+
+:is(h3, h4, h5, h6) {
+    font-family: var(--ft-body) !important;
+    text-transform: none !important;
+}
+
+.text-italic {
+    font-family: var(--ft-body-italic) !important;
+}
+
+code,
+.code {
+    font-family: var(--ft-code) !important;
+    text-transform: none;
+}
+
+/* Shapes */
+
+.shape,
+img.framed {
+    background-color: var(--yellow) !important;
+}
+
+div.shape {
+    background-color: var(--yellow);
+    height: 200px;
+    width: 200px;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    position: relative;
+  }
+  
+  div.shape.angles,
+  img.framed.angles {
+    mask-image: var(--angles);
+    -webkit-mask-image: var(--angles);
+  }
+  div.shape.cog,
+  img.framed.cog {
+    mask-image: var(--cog);
+    -webkit-mask-image: var(--cog);
+  }
+  div.shape.shield,
+  img.framed.shield {
+    mask-image: var(--shield);
+    -webkit-mask-image: var(--shield);
+  }
+  div.shape.star,
+  img.framed.star {
+    mask-image: var(--star);
+    -webkit-mask-image: var(--star);
+  }
+
+/* Image Frames */
+img.framed {
+    height: 200px;
+    width: 200px;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    mask-size: contain;
+    -webkit-mask-size: contain;
+    position: relative;
+  }
+
+/* Default table text */
+table,
+table td,
+table th {
+  color: var(--yellow); /* #feb101 */
+  font-family: var(--ft-body);
+  border: 1px solid var(--yellow);
+  border-collapse: collapse;
+  padding: 0.5em;
+}
+
+/* Optional: style table headers differently */
+table th {
+  font-family: var(--ft-title);
+  font-weight: 600;
+  background-color: rgba(254, 177, 1, 0.1); /* light tint of yellow */
+}
