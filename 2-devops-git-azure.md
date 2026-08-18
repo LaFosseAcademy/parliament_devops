@@ -46,14 +46,59 @@ An introduction to the core building blocks of Azure — before we touch Terrafo
 
 ### What is Cloud Computing, briefly
 
-Most students will have touched cloud services already, but let's ground it: cloud computing means renting compute, storage, and networking from someone else's datacentre, paid for as you use it, rather than buying and running your own physical servers.
+We've spoken about the Cloud briefly in the Taster Session already but I want to go into what that means a little more. 
+
+Cloud computing means renting:
+- compute
+- storage
+- and networking for someone else's data centre
+
+You pay for your usage instead of buying and running your own physical server. 
+
+**ASK** <br>
+Why do we think this is an option lots of companies take? <br>
+**ANSWER**<br>
+- There's no upfront costs
+- There's also reduced costs for a Datacenter Technician. The person who would be responsible for installing the server racks, cabling, power.
+- Also the ability to scale, if a company starts of with 1,000 users, it's easy to provision a small server from the cloud to accommodate those users. If a year later you have 100,000 users, equally it's simple to expand the resources taken from the cloud. 
+
+There's lots of different models of accessing resources on the Cloud. 
+
+I have an **iCloud** account. Based on the name we'd rightly say this is an example of Cloud computing. **iCloud** along with **Google Drive**, **One Drive** or **DropBox** all use the cloud but they only really offer is storage and networking.
+
+The models which use all 3 which I want to focus on are:
+- **SaaS**: Software as a Service
+- **PaaS**: Platform as a Service
+- **IaaS**: Infrastructure as a Service
+
+Software as a Service is fairly straight forward, tools like: Gmail, Salesforce, Zoom. They're complete applications we can make use of. 
+
+Platform as a Service is what it says on the tin. A platform for developers to build and run applications. Netlify, Heroku, Render. These types of services which require a bit more of a technical understanding and there's some ability to configure and manage the underlying servers. 
+
+Finally we have Infrastructure as a Service and this takes us further towards the bare metal computers at the heart of all these models. 
+
+Infrastructure as a service is essentially choosing what type of computer you want to access; how powerful, what storage and networking capabilities and it's your responsibility to manage to Operating System. 
+
+Working with the Infrastructure as a Service model will give you the most flexibility, control over the underlying computer but as you can imagine it requires the most investment. 
+
+This is what we're going to be focusing on over this Deep Dive though. 
+
+
 
 **ASK** <br>
 Which three providers dominate the cloud computing market? <br>
 **ANSWER** <br>
 AWS, Microsoft Azure, and Google Cloud Platform (GCP).
 
-We're focusing on **Azure** for this part of the course. It's deeply integrated with the Microsoft ecosystem many enterprises already run on (Active Directory, Office 365, Windows Server), and it has strong first-party DevOps tooling — which matters a lot for where we're heading today.
+We're focusing on **Azure** for this part of the course, which is also what PDS use. It's deeply integrated with the Microsoft ecosystem many enterprises already run on.
+
+You may have heard of **Active Directory**, it's a Microsoft product, essentially a digital phonebook. Lots of companies will give their employees Windows computers and use Active Directory to store their credentials. 
+
+You'll be familiar with other Microsoft products like Office 365.
+
+Windows Server is another operating system, specifically for servers.
+
+All these different products are compatible with Azure.
 
 *REFER TO RESOURCE 1 - SLIDEE* <br>
 
@@ -69,9 +114,9 @@ Azure organises everything you own into a hierarchy. Understanding this now will
 
 From the top down:
 
-* **Tenant**: your organisation's identity boundary in **Azure AD** (Azure Active Directory). Almost always one tenant per organisation. Every user, group, and application registration lives inside a tenant.
+* **Tenant**: your organisation's identity in **Azure AD** (Azure Active Directory). Almost always one tenant per organisation. Every user, group, and application registration lives inside a tenant.
 * **Subscription**: a billing and access boundary *inside* a tenant. A single tenant can hold multiple subscriptions — commonly one per environment (`Dev`, `Test`, `Prod`) or one per business unit.
-* **Resource Group**: a logical container inside a subscription that groups related resources sharing a lifecycle — we've already met this concept if any of you have seen the Terraform sessions preview.
+* **Resource Group**: this is a logical container inside a subscription that groups related resources sharing a lifecycle — imagine we have an application and we need a Virtual Machine, a Database and the ability to Monitor those resources. They'd all be attached to the same Resource Group.
 * **Resource**: the actual thing being managed — a Virtual Machine, a Storage Account, a Virtual Network, and so on.
 
 **ASK** <br>
