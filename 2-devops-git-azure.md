@@ -148,8 +148,6 @@ I want to get you to hands on and just explore the **Subscription resource**. If
 
 ### Regions and Availability
 
-We touched on this briefly if you've seen the resource provisioning sessions, but let's properly ground it here.
-
 Azure runs datacentres in **regions** all over the world — `uksouth`, `northeurope`, `eastus`, and so on. Choosing a region affects **latency** (how close your users are to the servers) and **data residency** (which country your data legally sits in — often a compliance requirement, not just a preference).
 
 **ASK** <br>
@@ -157,9 +155,16 @@ Beyond latency, why might a UK-based healthcare company specifically care which 
 **ANSWER** <br>
 Regulatory requirements (e.g. UK GDPR, NHS data handling rules) can require patient data to stay within the UK, ruling out regions outside the country entirely regardless of cost or latency.
 
-Some Azure regions come in **paired** sets for disaster recovery — for example, **UK South** is paired with **UK West**. Microsoft coordinates updates and prioritises recovery between paired regions, which is worth knowing about when designing for resilience, even though we won't configure it today.
+**ASK** <br>
+Why may a company want to have resources in **UK South** and also in **UK West**
+**ANSWER** <br>
+In case there's a disaster in one region
+
+Some Azure regions are designed as **paired** sets for disaster recovery — for example, **UK South** is paired with **UK West**. Microsoft coordinates updates and prioritises recovery between paired regions, which is worth knowing about when designing for resilience, even though we won't configure it today.
 
 Within a region, Azure also offers **Availability Zones** — physically separate datacentres within the same region, each with independent power and networking, so a failure in one zone doesn't take down the others.
+
+It would be my assumption that the regions PDS use will have to reside within the UK for the integrity of any data. 
 
 <br>
 <br>
