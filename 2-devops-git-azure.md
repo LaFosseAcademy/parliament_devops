@@ -206,8 +206,6 @@ Lots of different ways we can assess how much something is costing us.
 In your roles you wont be setting the department budget, nor how much of that budget you can spend. But monitoring the spend through budgets and investigating any unexpected increases in cost is definitely your responsibility. 
 
 
-# START
-
 Let's create something by hand, the way we might if we were just getting started with Azure and hadn't heard of Terraform yet.
 
 * Search **Resource groups** > **Create**
@@ -221,6 +219,9 @@ Let's create something by hand, the way we might if we were just getting started
 That took maybe 30 seconds. Quick, easy, and — as we'll get to shortly — exactly the kind of thing that becomes a real problem at scale.
 
 Remember the graph I showed you at the beginning of the day, we have our: **Tenant** then **Subscription** followed by a **Resource Group**, once we've done that we can provision **Resources**
+
+
+# START
 
 <br>
 <br>
