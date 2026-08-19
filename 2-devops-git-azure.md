@@ -304,27 +304,39 @@ We don't need to dwell too long on CLI syntax here — this isn't a CLI deep-div
 
 That idea is the whole bridge into Infrastructure as Code later in the Deep Dive. <br>
 
-# START
-
 <br>
 <br>
 
 ### Identity and Access: Azure AD, RBAC and Service Principals
 
-We need a foundational understanding of identity before we can talk sensibly about automation.
+We need a foundational understanding of identity before we can talk about automation.
 
-**Azure AD** is Azure's identity provider — it's where **users**, **groups**, and **application identities** live, and it sits *above* subscriptions in the hierarchy we drew earlier (one Azure AD tenant can be linked to many subscriptions).
+**Azure AD** is Azure's identity provider, we've mentioned it before, **"Azure Active Directory"** — it's where **users**, **groups**, and **application identities** live, and it sits *above* subscriptions in the hierarchy we drew, (one Azure AD tenant can be linked to many subscriptions).
 
 **ASK** <br>
 So far, who or what has been authenticating to Azure in everything we've done today? <br>
 **ANSWER** <br>
-A human — `emilesherrott_dev`, via `az login` or the Portal sign-in.
+A human — `emilesherrott` or my account, via `az login` or the Portal sign-in.
 
 That's fine for a person clicking around, but it doesn't work well for automation. This is where **Service Principals** come in — an identity in Azure AD that represents an **application or automated process**, rather than a human.
 
-* `az ad sp create-for-rbac --name "example-automation-identity" --role="Reader" --scopes="/subscriptions/<your-subscription-id>"`
+There's a command I want us to run.
 
-Running this returns an `appId` (Client ID), `password` (Client Secret), and `tenant` — credentials that a script, pipeline, or tool can authenticate with, entirely independent of any human's login.
+* `az account show` <br>
+Then make a note or copy the value against the key of ID, this is our subscription ID
+
+* `az ad sp create-for-rbac --name "example-automation-identity" --role="Reader" --scopes="/subscriptions/<your-subscription-id>"`
+  * `az` - Is the Azure CLI executable
+  * `ad` - This is the Azure Active Directory, which is now called Microsoft Entra ID. We're telling Azure we want to work with Microsofts identity system
+  * `sp` - SP is Service Principal, which is an identity for an application or automation rather than a human
+    * Imagine we had a script we wanted to run, instead of logging in as ourselves, we can create a Service Principle and the script uses the service principle to authenticate itself
+  * `create-for-rbac` - Creates a service principle and configure an Azure role-based access control for it
+  * We then give our service principle a name and then permissions, in this case to read. You may see things like **"Contributor"** instead
+  * Then we finally provide the scope, where can the Reader Service Principle actually do its work
+
+* `az ad sp create-for-rbac --name "example-automation-identity" --role="Reader" --scopes="/subscriptions/a755c4aa-edd0-4c67-83d9-bc7adc18bb18"`
+
+Running this returns an `appId`, `displayName`, `password`, and `tenant` — credentials that a script, pipeline, or tool can authenticate with, entirely independent of any human's login.
 
 **ASK** <br>
 Why would we want automation to use its own separate identity, rather than just running everything under a person's own Azure login? <br>
@@ -332,6 +344,16 @@ Why would we want automation to use its own separate identity, rather than just 
 It doesn't break when that person is on holiday or leaves the company; it can be scoped down to only the permissions it actually needs; it can be rotated or revoked on its own without touching a human's account; and it works headlessly, without anyone needing to be logged in at all — essential for anything running in a pipeline.
 
 Access itself is controlled through **RBAC** — **Role-Based Access Control**. A **role** (like `Owner`, `Contributor`, or `Reader`) is assigned to an identity (a user *or* a Service Principal) **at a scope** — a Management Group, a Subscription, a Resource Group, or an individual Resource.
+
+So we want `--scope="/subscriptions/<subscription-id>"` <br>
+
+If we wanted to we could have had: `--scope="/subscriptions/<subscription-id>/resourceGroups/<resource-group-name>"`
+
+We can see our Service Principles as well: `az ad sp list -o table` 
+
+These are all the applications and identities which exist for my at the level of my tenant, LaFosse.com
+
+# START
 
 *REFER TO RESOURCE 3 - SLIDEE* <br>
 
