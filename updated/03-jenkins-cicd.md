@@ -6,7 +6,30 @@ A full day taking entry-level trainees from "I've heard the word pipeline" to "I
 
 ### Audience
 
-Entry-level DevOps trainees who have already covered **Azure cloud fundamentals**, **Docker**, and **bash scripting & automation**. Assume they can build and run a Docker image, write a small shell script, and use Git at a basic level (clone, commit, push). Assume **no** prior exposure to Jenkins or any CI/CD tool. Jenkins runs on **each student's own laptop** — Windows or Mac — so a chunk of today is making that work reliably.
+Entry-level DevOps trainees who have already covered **Azure cloud fundamentals**, **Docker**, and **bash scripting & automation**. Assume they can build and run a Docker image, write a small shell script, and use Git at a basic level (clone, commit, push). Assume **no** prior exposure to Jenkins or any CI/CD tool, and **no** prior exposure to Groovy — so the `Jenkinsfile` syntax is explained from first principles, block by block. Jenkins runs on **each student's own laptop** — Windows or Mac — so a chunk of today is making that work reliably.
+
+### How this document is laid out — read before delivering
+
+Today you're constantly switching between **a terminal** and **a browser**, which is exactly where trainees get lost. So every instruction block is labelled with where it happens:
+
+- *(Run from `~/jenkins-training`)* — a **terminal** command, in that folder
+- *(In the Jenkins UI — Dashboard)* — a **browser** action, starting from that screen
+- Navigation steps are written as breadcrumbs, e.g. **Manage Jenkins → Credentials → Add Credentials**
+
+The folders we use today:
+
+| Folder | What it's for |
+|---|---|
+| `~/jenkins-training` | Where we build the custom Jenkins image and run Docker commands |
+| `~/jenkins-training/<your-fork>` | Your cloned fork of the starter repo — where the `Jenkinsfile` lives |
+
+**Every activity has a `**Solution**` block** immediately afterwards, so you can reveal the answer without hunting for it.
+
+Set the working folder up before you start:
+
+*(Run from `~/`)*
+- Run: `mkdir -p ~/jenkins-training` → **cd inside** with `cd ~/jenkins-training`
+- Confirm with `pwd`
 
 ### Duration & schedule
 
@@ -19,7 +42,7 @@ Full day, **09:00–17:00**, with a one-hour lunch and two 15-minute breaks. Rou
 | **10:00–10:15** | **Break** | |
 | 10:15–11:15 | Installing & touring Jenkins on your laptop | **Exercise (install) + tour** |
 | 11:15–12:15 | Your first job: watching Jenkins build something | **Exercise** |
-| 12:15–13:00 | Pipeline as code: your first `Jenkinsfile` | **Exercise** |
+| 12:15–13:00 | Pipeline as code: your first `Jenkinsfile` | **Exercise + Challenge** |
 | **13:00–14:00** | **Lunch** | |
 | 14:00–14:45 | Anatomy of a pipeline: stages, environment, post, parallel | Talk + short exercise |
 | 14:45–15:00 | Connecting Jenkins to Git, and triggering builds | Talk + demo |
@@ -62,7 +85,8 @@ The single biggest time-sink in a room of local laptops is Docker Desktop not be
 - **Explain** what CI/CD means, what a pipeline is, and *why* teams use them instead of releasing by hand
 - **Install** and run a working Jenkins instance locally on Windows or Mac
 - **Create and run** a Freestyle job and watch a build execute
-- **Write** a declarative `Jenkinsfile` with stages, environment variables, parameters, `post` actions, and parallel stages
+- **Read and write** declarative `Jenkinsfile` syntax — blocks, stages, steps, string interpolation, `sh`
+- **Use** environment variables, parameters, `post` actions, and parallel stages
 - **Understand** the difference between pipeline-in-the-UI and pipeline-as-code, and why the second one wins
 - **Connect** Jenkins to a Git repository and trigger builds automatically
 - **Build** a complete pipeline that tests an app, builds a Docker image, and pushes it — the exact shape a real team ships software with
@@ -82,6 +106,12 @@ Today is that missing piece. It's called a **pipeline**, and the tool we'll use 
 Here's the shape of the day. This morning is mostly about the *idea* — what CI/CD and pipelines actually are and why anyone bothers — and then getting Jenkins running on your own laptop and building your first jobs. This afternoon we go deeper into writing pipelines as code, and then spend the back half building one real, end-to-end pipeline that tests an app, builds a Docker image, and pushes it to Docker Hub — completely automatically.
 
 Jenkins runs on *your* machine today, so there's a bit of setup, and setup on real laptops is always where the gremlins live — shout early if something's not working and we'll sort it together. Lunch is at 1 for an hour, breaks mid-morning and mid-afternoon.
+
+**Everyone make a working folder now, so we're all in the same place:**
+
+*(Run from `~/`)*
+- Run: `mkdir -p ~/jenkins-training` → **cd inside** with `cd ~/jenkins-training`
+- Run: `docker --version` — confirm Docker responds. If it doesn't, flag it now, not at 10:15.
 
 <br>
 <br>
@@ -132,6 +162,7 @@ One last mental model before we install it. Jenkins has two conceptual parts, an
 
 - The **controller** runs the web interface, stores your configuration, and decides what work needs doing.
 - **Agents** are separate machines or containers the controller hands the actual work to.
+- An **executor** is a single "slot" for running one build at a time. A node with two executors can run two builds simultaneously.
 
 **ASK** <br>
 Why might a real team not want the controller itself running every build directly? <br>
@@ -157,7 +188,9 @@ There's one wrinkle we're going to solve up front. Later today our pipeline need
 
 **Step 1 — build a Jenkins image that can use Docker**
 
-In your cloned starter repo there's a `Dockerfile` for this (or create one). It's four lines:
+*(Run from `~/jenkins-training`)*
+- Run: `touch Dockerfile`
+- Then open it: `code Dockerfile`
 
 ```dockerfile
 FROM jenkins/jenkins:lts-jdk17
@@ -166,16 +199,26 @@ RUN apt-get update && apt-get install -y docker.io && rm -rf /var/lib/apt/lists/
 USER jenkins
 ```
 
-Read it — this is exactly the Docker knowledge you already have: start from the official Jenkins image, become root, install the Docker CLI, drop back to the jenkins user. Build it:
+Read it line by line — this is exactly the Docker knowledge you already have:
+- `FROM jenkins/jenkins:lts-jdk17` — start from the official Jenkins image. `lts` means Long Term Support, the stable release line.
+- `USER root` — switch to the root user, because installing packages needs admin rights
+- `RUN apt-get update && apt-get install -y docker.io ...` — install the Docker **command-line tool** (not a whole Docker engine). The `&&` is the one from your bash session: only install if the update succeeded. `rm -rf /var/lib/apt/lists/*` deletes the downloaded package index afterwards to keep the image small — a standard Dockerfile habit.
+- `USER jenkins` — drop back to the normal jenkins user, so we're not running as root unnecessarily.
 
+Build it:
+
+*(Run from `~/jenkins-training`)*
 ```bash
 docker build -t jenkins-docker .
 ```
+
+`-t jenkins-docker` names ("tags") the image; the `.` at the end means "build using the Dockerfile in this current directory".
 
 **Step 2 — run it**
 
 On **Mac** (Terminal) or **Windows** (use **Git Bash**, so the `\` line-breaks work):
 
+*(Run from `~/jenkins-training`)*
 ```bash
 docker run -d --name jenkins \
   -p 8080:8080 -p 50000:50000 \
@@ -187,34 +230,51 @@ docker run -d --name jenkins \
 
 If you'd rather paste a single line (works in any shell, including PowerShell):
 
+*(Run from `~/jenkins-training`)*
 ```bash
 docker run -d --name jenkins -p 8080:8080 -p 50000:50000 -v jenkins_home:/var/jenkins_home -v /var/run/docker.sock:/var/run/docker.sock -u root jenkins-docker
 ```
 
-What each part does:
-- `-d` — run in the background (detached)
-- `-p 8080:8080` — the Jenkins web interface, which we'll open in a browser
+What each flag does — go through these, they're all revision from the Docker session:
+- `-d` — **detached**: run in the background and give you your terminal back
+- `--name jenkins` — give the container a friendly name, so we can say `docker stop jenkins` rather than using a random ID
+- `-p 8080:8080` — **port mapping**, `host:container`. Traffic to port 8080 on your laptop is forwarded to port 8080 inside the container, which is where the Jenkins web interface listens
 - `-p 50000:50000` — the port Jenkins uses to talk to agents (unused today, but standard)
-- `-v jenkins_home:/var/jenkins_home` — a **named volume** so all your Jenkins config survives if the container is recreated. You met volumes in the Docker session — this is why they matter: without it, restart Jenkins and everything you built today is gone.
-- `-v /var/run/docker.sock:/var/run/docker.sock` — this hands the container access to your laptop's Docker, so pipelines can build images. This is the bit that makes the capstone possible.
-- `-u root` — run as root so we sidestep Docker permission faff. Fine for training; **not** how you'd do it in production.
+- `-v jenkins_home:/var/jenkins_home` — a **named volume**. Everything Jenkins saves (config, jobs, plugins, your user) lives at `/var/jenkins_home` *inside* the container; this maps it to storage managed by Docker on your laptop, which survives the container being deleted
+- `-v /var/run/docker.sock:/var/run/docker.sock` — this one's different: it mounts your laptop's **Docker socket** into the container. The socket is the "phone line" the `docker` command uses to talk to the Docker engine. Handing it in means Jenkins can run `docker build` using your laptop's Docker. **This is the bit that makes the capstone possible.**
+- `-u root` — run as root, to sidestep Docker permission faff. Fine for training; **not** how you'd do it in production
+- `jenkins-docker` — the image to run (the one we just built)
 
 **NOTE FOR TRAINERS** <br>
 On both Docker Desktop for Mac and Docker Desktop for Windows (WSL2 backend), `/var/run/docker.sock` is exposed and the socket mount works as written — this is the reliable cross-platform path. Running `-u root` is a deliberate simplification to avoid the docker-group permission dance in a classroom; call it out honestly as a training shortcut so nobody copies it into a real setup. If a student's install refuses the socket mount, they can still do the *entire* day except the final `docker build`/`docker push` stages, so don't let one broken socket block someone — pair them up. <br>
 **END OF NOTE**
 
+Check it's actually running:
+
+*(Run from `~/jenkins-training`)*
+```bash
+docker ps
+```
+
+You should see a container named `jenkins` with a status of "Up". If it's not there, run `docker ps -a` to see stopped containers, and `docker logs jenkins` to see why it fell over.
+
 **Step 3 — unlock and set up**
 
-Jenkins takes a minute or two to start. Then:
+Jenkins takes a minute or two to start. Then fetch the one-time admin password from inside the container:
 
+*(Run from `~/jenkins-training`)*
 ```bash
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-Copy that password, open **`http://localhost:8080`** in your browser, and paste it in. Then:
+`docker exec jenkins <command>` means "run this command inside the already-running container called jenkins". Here we're `cat`-ing a file that only exists inside it.
+
+*(In your browser)*
+- Go to **`http://localhost:8080`**
+- Paste the password in
 - Choose **Install suggested plugins** — this pulls in the Git, Pipeline and Credentials plugins we'll use all day. Give it a few minutes.
-- Create your first **admin user** when prompted (remember the username and password — you'll log in with it all day).
-- Accept the default Jenkins URL.
+- Create your first **admin user** when prompted — **write the username and password down**, you'll log in with it all day
+- Accept the default Jenkins URL
 
 **ASK** <br>
 We deliberately mounted a named volume at `/var/jenkins_home`. Based on the Docker session, what would happen to your admin user, your plugins, and every job you build today if we *hadn't*? <br>
@@ -223,20 +283,62 @@ They'd all vanish the moment the container was removed and recreated, because a 
 
 **A quick tour of the interface**
 
-Now let's get oriented. Point these out on your own screen as I describe them:
+*(In the Jenkins UI — Dashboard, at `http://localhost:8080`)*
 
-- **Dashboard** — the home page; every job you create shows here with its recent status (blue/green = passing, red = failing).
-- **New Item** — how you create a new job. "Item" is just Jenkins' word for a job.
-- **Manage Jenkins** — the settings hub. Two areas we care about:
-  - **Plugins** — almost everything Jenkins can do comes from plugins. The "suggested" set you just installed is only a starter kit.
-  - **Credentials** — a secure vault for secrets (Git tokens, Docker Hub passwords). We'll use this properly this afternoon, and it's a genuinely important habit.
-- **Build History** — a running log of every build across all jobs.
+Point these out on your own screen as you describe them:
+
+- **Dashboard** — the home page; every job you create shows here with its recent status (blue/green = passing, red = failing)
+- **New Item** (top left) — how you create a new job. "Item" is just Jenkins' word for a job
+- **Manage Jenkins** (left sidebar) — the settings hub. Three areas we care about:
+  - **Plugins** — almost everything Jenkins can do comes from plugins. The "suggested" set you just installed is only a starter kit
+  - **Credentials** — a secure vault for secrets (Git tokens, Docker Hub passwords). We'll use this properly this afternoon
+  - **Nodes** — where build machines are listed
+- **Build History** (left sidebar) — a running log of every build across all jobs
 
 **HANDS ON (remaining time)** <br>
 1. Get Jenkins running via the steps above and log in with your new admin user.
-2. Go to **Manage Jenkins > Plugins > Installed plugins**. Scroll the list and pick **three plugins you don't recognise** — search their names and jot down, in a sentence each, what they do.
-3. Go to **Manage Jenkins > Nodes**. You'll see one node ("Built-In Node"). This is the controller acting as its own builder — exactly the "fine for learning, not for production" setup we described. Note how many executors it has.
+2. *(In the Jenkins UI)* Go to **Manage Jenkins → Plugins → Installed plugins**. Scroll the list and pick **three plugins you don't recognise** — search their names and jot down, in a sentence each, what they do.
+3. *(In the Jenkins UI)* Go to **Manage Jenkins → Nodes**. You'll see one node, "Built-In Node". This is the controller acting as its own builder — exactly the "fine for learning, not for production" setup we described. Note how many **executors** it has.
 **END OF NOTE**
+
+**Solution**
+
+The full install sequence, start to finish:
+
+*(Run from `~/`)*
+```bash
+mkdir -p ~/jenkins-training && cd ~/jenkins-training
+```
+
+*(Run from `~/jenkins-training`)*
+```bash
+# 1. Create the Dockerfile (contents as above), then build it
+docker build -t jenkins-docker .
+
+# 2. Run it
+docker run -d --name jenkins -p 8080:8080 -p 50000:50000 -v jenkins_home:/var/jenkins_home -v /var/run/docker.sock:/var/run/docker.sock -u root jenkins-docker
+
+# 3. Confirm it started
+docker ps
+
+# 4. Get the unlock password
+docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+Then *(in your browser)* `http://localhost:8080` → paste password → **Install suggested plugins** → create admin user.
+
+Step 3 answer: the Built-In Node has **2 executors** by default, meaning Jenkins can run two builds at the same time before queuing.
+
+Useful troubleshooting commands to have on hand:
+
+*(Run from `~/jenkins-training`)*
+```bash
+docker logs jenkins          # see why it won't start
+docker stop jenkins          # stop it (data survives — it's in the volume)
+docker start jenkins         # start it again
+docker rm -f jenkins         # remove the container entirely (data STILL survives)
+docker volume ls             # confirm jenkins_home volume exists
+```
 
 <br>
 <br>
@@ -248,11 +350,15 @@ We're going to make Jenkins actually *do* something now, using the simplest poss
 
 **A Freestyle job**
 
-A **Freestyle project** is a job configured entirely by clicking in the web UI. No code. Let's make one.
+A **Freestyle project** is a job configured entirely by clicking in the web UI. No code at all.
 
-- **New Item** > name it `hello-jenkins` > choose **Freestyle project** > **OK**
-- Scroll to **Build Steps** > **Add build step** > **Execute shell**
-- In the box, enter:
+*(In the Jenkins UI — Dashboard)*
+- Click **New Item** (top left)
+- **Enter an item name**: `hello-jenkins`
+- Select **Freestyle project** → click **OK**
+- You land on the job's configuration page. Scroll down to **Build Steps**
+- Click **Add build step** → **Execute shell**
+- In the box that appears, enter:
 
 ```bash
 echo "Hello from Jenkins!"
@@ -260,8 +366,11 @@ echo "This build is running as: $(whoami)"
 echo "The time is: $(date)"
 ```
 
-- **Save**, then click **Build Now** on the left.
-- A build appears under **Build History** (bottom left) with a number, `#1`. Click it, then click **Console Output**.
+*(Note: this is plain bash — exactly what you wrote in the last session. `$(whoami)` and `$(date)` are the command substitution you already know.)*
+
+- Click **Save** at the bottom
+- On the job's page, click **Build Now** in the left sidebar
+- A build appears under **Build History** (bottom left) numbered `#1`. Click **#1**, then click **Console Output**
 
 There it is — the exact output of your shell commands, captured and shown in the browser. That's the entire heart of Jenkins: it ran your steps somewhere, and kept the log.
 
@@ -272,39 +381,74 @@ Where in an *earlier* session did we see almost exactly this pattern — a set o
 
 **The workspace and built-in variables**
 
-Every build runs inside a **workspace** — a folder on disk where Jenkins does its work. And Jenkins injects useful **environment variables** into every build automatically. Let's use one.
+Every build runs inside a **workspace** — a folder on disk where Jenkins does its work, one per job. And Jenkins automatically injects useful **environment variables** into every build. Let's use one.
 
-- **Configure** the job again, and change the shell step to:
+*(In the Jenkins UI — the `hello-jenkins` job)*
+- Click **Configure** in the left sidebar
+- Scroll to your **Execute shell** box and replace its contents with:
 
 ```bash
 echo "This is build number $BUILD_NUMBER"
+echo "The job is called $JOB_NAME"
+echo "My workspace is $WORKSPACE"
 echo "Build $BUILD_NUMBER of job $JOB_NAME" > result.txt
 cat result.txt
 ```
 
-- **Save** and **Build Now** a couple of times. Open the Console Output each time.
+The variables Jenkins gives you for free include:
+
+| Variable | What it holds |
+|---|---|
+| `$BUILD_NUMBER` | The number of this build — 1, 2, 3... increments every run |
+| `$JOB_NAME` | The name of the job (`hello-jenkins`) |
+| `$WORKSPACE` | The full path to the folder this build is running in |
+| `$BUILD_URL` | The web address of this specific build |
+
+- **Save** → **Build Now**, twice. Open the **Console Output** each time.
 
 **ASK** <br>
 If you run this job five times, what will `result.txt` say each time, and why? <br>
 **ANSWER** <br>
 A different number each run — `$BUILD_NUMBER` increases by one every build. Jenkins gives every build a unique, ever-incrementing number, which becomes really useful later for tagging things (like Docker images) so you can trace exactly which build produced which artifact.
 
-**Keeping the output**
+**Keeping the output — artifacts**
 
-Right now `result.txt` is buried in a workspace folder. We can publish it so it's downloadable from the build page:
+Right now `result.txt` is buried in a workspace folder. An **artifact** is a file a build produces that you want to keep and download afterwards. Let's publish it.
 
-- **Configure** > **Post-build Actions** > **Add** > **Archive the artifacts**
+*(In the Jenkins UI — the `hello-jenkins` job)*
+- **Configure** → scroll to **Post-build Actions**
+- Click **Add post-build action** → **Archive the artifacts**
 - **Files to archive**: `result.txt`
-- **Save**, **Build Now**, and notice the archived `result.txt` now appears as a link on the build's page.
+- **Save** → **Build Now**
+- On the completed build's page, `result.txt` now appears as a downloadable link
+
+**Making a job trigger itself — cron syntax**
+
+*(In the Jenkins UI — the `hello-jenkins` job)*
+- **Configure** → **Build Triggers** → tick **Build periodically**
+- In the **Schedule** box enter: `H/5 * * * *`
+
+That's the cron syntax from the automation session. Five fields, in order:
+
+```
+ minute  hour  day-of-month  month  day-of-week
+   */5     *         *         *         *
+```
+
+`*` means "every". So `*/5 * * * *` means "every 5 minutes, every hour, every day".
+
+Jenkins adds one twist: **`H` means "hash"** — it spreads the load. `H/5` still means "every 5 minutes", but Jenkins picks *which* minute within each 5-minute window based on the job name, so 200 jobs don't all fire at exactly the same second. Use `H` wherever you'd otherwise use `*` in the minute field — it's the Jenkins convention.
+
+- **Save**, and watch it trigger itself over the next few minutes. Then **turn it off again** so it isn't running all day.
 
 **The catch with Freestyle — and why we're about to leave it**
 
 We've got a working job. But let's poke at it the way we poke at everything in this course.
 
 **ASK** <br>
-All of this configuration — the shell commands, the archive setting, the build number logic — where does it actually *live*? <br>
+All of this configuration — the shell commands, the archive setting, the trigger schedule — where does it actually *live*? <br>
 **ANSWER** <br>
-Inside Jenkins itself, in its own internal config. **Not** in your Git repository.
+Inside Jenkins itself, in its own internal config (in that `jenkins_home` volume). **Not** in your Git repository.
 
 **ASK** <br>
 Given everything this course has hammered about wanting things "as code" — reviewable, versioned, repeatable — what problems does that cause? <br>
@@ -314,16 +458,43 @@ No version history of how the build process changed. No code review before someo
 That gap is what **Pipelines** fix, and that's where we're going next.
 
 **HANDS ON (remaining time)** <br>
-1. Build the `hello-jenkins` job above, including the `$BUILD_NUMBER` version and the archived artifact.
-2. **Configure** the job > **Build Triggers** > tick **Build periodically** and enter `H/5 * * * *` (that's cron syntax from the automation session — roughly every 5 minutes). Watch it trigger itself on its own. Then **turn it off again** so it's not running all day.
-3. In pairs, discuss: if three people on your team disagreed about what the build steps should do, how would you even resolve that disagreement with a Freestyle job? (Hint: there's nothing to review, comment on, or merge.)
+1. Build the `hello-jenkins` job, including the `$BUILD_NUMBER` version and the archived artifact.
+2. Add a **Build periodically** trigger of `H/5 * * * *`, watch it fire on its own, then turn it off.
+3. Add a second shell step that deliberately fails (`exit 1`) *before* the working one, rebuild, and look at what the build status and Console Output show you.
+4. In pairs, discuss: if three people on your team disagreed about what the build steps should do, how would you even resolve that disagreement with a Freestyle job? (Hint: there's nothing to review, comment on, or merge.)
 **END OF NOTE**
+
+**Solution**
+
+**Step 1 —** *(In the Jenkins UI — Dashboard)* **New Item** → `hello-jenkins` → **Freestyle project** → **OK** → **Build Steps** → **Add build step** → **Execute shell**:
+
+```bash
+echo "This is build number $BUILD_NUMBER"
+echo "The job is called $JOB_NAME"
+echo "Build $BUILD_NUMBER of job $JOB_NAME" > result.txt
+cat result.txt
+```
+
+Then **Post-build Actions** → **Archive the artifacts** → **Files to archive**: `result.txt` → **Save** → **Build Now**.
+
+**Step 2 —** **Configure** → **Build Triggers** → tick **Build periodically** → Schedule: `H/5 * * * *` → **Save**. Untick it again afterwards.
+
+**Step 3 —** Add this as a build step *above* the working one:
+
+```bash
+echo "About to fail on purpose"
+exit 1
+```
+
+The build goes **red**, the Console Output ends at `exit 1`, and **the second build step never runs** — Jenkins stopped the moment a step returned a non-zero exit code. That's the same exit-code contract from the bash session, now being enforced by a tool. Remove the step to go green again.
+
+**Step 4 discussion answer —** You couldn't resolve it properly. There's no diff to look at, no pull request to comment on, no history showing who changed what and why. Somebody just clicks, and the change is live for everyone immediately. That's precisely the argument for pipeline-as-code.
 
 <br>
 <br>
 
 ### 12:15–13:00 — Pipeline as Code: Your First `Jenkinsfile`
-*(Exercise)*
+*(Exercise + Challenge)*
 
 Here's the big shift. Instead of configuring a job by clicking, we describe the whole pipeline in a **text file** called a `Jenkinsfile`, and we keep that file **in Git, alongside the code it builds**.
 
@@ -332,11 +503,38 @@ Where have we seen this exact philosophy already — describing something as a t
 **ANSWER** <br>
 Everywhere this course goes: the bash scripts you wrote, the Dockerfile that defines an image, and — coming up soon — Terraform's `.tf` files. Same instinct every time: the desired thing described as reviewable, versioned, repeatable code, not clicked together by hand and forgotten.
 
-A `Jenkinsfile` can be written two ways — **Scripted** (full programming language, very flexible, harder to read) and **Declarative** (a cleaner, more structured style). We'll use **Declarative** the whole day; it's the recommended starting point and covers the vast majority of real pipelines.
+**A word on the syntax before we write any**
+
+A `Jenkinsfile` is written in a language called **Groovy**. You don't need to learn Groovy — we're using a restricted, structured subset called **Declarative Pipeline**, which is really just a set of nested blocks. But three bits of syntax will look unfamiliar, so let's name them now:
+
+**1. Everything is a block, marked by `{ }`.** A block is a named container holding other things. They nest inside each other like Russian dolls:
+
+```groovy
+pipeline {        // outermost block
+    stages {      // a block inside it
+        stage('Build') {   // a block inside that
+            steps {        // and one more
+                echo 'hello'
+            }
+        }
+    }
+}
+```
+
+There are **no semicolons** at the end of lines, and indentation is for humans (Groovy doesn't care), but keep it tidy or the nesting becomes impossible to read.
+
+**2. `sh` runs a shell command.** `sh 'npm install'` is exactly like typing `npm install` in a terminal. It's how a pipeline actually *does* anything. (There's also `bat` for Windows batch commands — we won't need it, because our Jenkins runs in a Linux container.)
+
+**3. Single quotes and double quotes behave differently.** This one genuinely catches people out:
+
+| Written as | Behaviour |
+|---|---|
+| `'Hello ${NAME}'` | **single quotes** — literal. Groovy leaves `${NAME}` exactly as typed |
+| `"Hello ${NAME}"` | **double quotes** — Groovy substitutes the variable's value in |
+
+So `echo "Building ${APP_NAME}"` prints the value; `echo 'Building ${APP_NAME}'` prints the literal text. **If you want a variable filled in by Groovy, you need double quotes.** (Confusingly, `sh 'echo $APP_NAME'` also works — because there the *shell* does the substitution, not Groovy. Both routes get you there; just be aware there are two different mechanisms.)
 
 **The simplest possible pipeline**
-
-Let me show you the shape, then you'll build it:
 
 ```groovy
 pipeline {
@@ -353,26 +551,30 @@ pipeline {
 ```
 
 Reading it top to bottom:
-- `pipeline { }` — every declarative pipeline is wrapped in this. Always.
-- `agent any` — "run this on any available builder." Today that's our controller.
-- `stages { }` — the ordered list of phases. This is the assembly line.
-- `stage('Say Hello') { }` — one phase, with a name that'll show up in the UI.
-- `steps { }` — the actual things to do in that stage. `echo` just prints.
+- `pipeline { }` — every declarative pipeline is wrapped in this. Always. It's the outermost container
+- `agent any` — "run this on any available builder/executor". Today that's our controller
+- `stages { }` — the container holding the ordered list of phases. **This is the assembly line**
+- `stage('Say Hello') { }` — one phase. The text in quotes is its name, and it's what shows up in the UI
+- `steps { }` — the container for the actual things to do in that stage
+- `echo` — a built-in step that just prints a message
 
 **Run it**
 
-For now we'll paste it straight into Jenkins (we'll move it into Git this afternoon):
+For now we'll paste it straight into Jenkins (we'll move it into Git this afternoon).
 
-- **New Item** > name it `hello-pipeline` > choose **Pipeline** > **OK**
-- Scroll to the **Pipeline** section. Leave **Definition** as **Pipeline script**.
-- Paste the pipeline above into the **Script** box.
-- **Save**, then **Build Now**.
+*(In the Jenkins UI — Dashboard)*
+- **New Item** → name it `hello-pipeline` → select **Pipeline** → **OK**
+- Scroll right down to the **Pipeline** section at the bottom
+- Leave **Definition** as **Pipeline script**
+- Paste the pipeline above into the **Script** box
+- **Save** → **Build Now**
 
-Look at the build — Jenkins now shows a little **Stage View**: a box for "Say Hello" with a green tick. That visual is a real benefit: as pipelines grow, you can see *at a glance* exactly which stage passed and which one broke.
+Look at the build page — Jenkins now shows a **Stage View**: a box labelled "Say Hello" with a green tick. As pipelines grow, that visual lets you see *at a glance* exactly which stage passed and which broke.
 
 **Add a second stage so you can see the assembly line**
 
-- **Configure** and change the pipeline to:
+*(In the Jenkins UI — the `hello-pipeline` job)*
+- **Configure** → replace the script with:
 
 ```groovy
 pipeline {
@@ -395,20 +597,148 @@ pipeline {
 }
 ```
 
-Note `sh` — that runs an actual shell command, exactly like a step in a bash script. (This is why we run Jenkins in a Linux container: `sh` behaves identically for everyone, whether you're on Windows or Mac.)
-
-- **Save**, **Build Now**, and watch the Stage View now show **two** boxes, Build then Test, lighting up green in order.
+- **Save** → **Build Now**, and watch the Stage View show **two** boxes, Build then Test, lighting up green in order.
 
 **ASK** <br>
 Why is it genuinely useful that each stage shows up separately in the UI, rather than the whole build just being "passed" or "failed"? <br>
 **ANSWER** <br>
-When something breaks, you instantly see *where* — "Test failed" tells you far more than "the build failed". On a real pipeline with checkout, build, test, package and deploy stages, that pinpointing saves a lot of time, and it's why we split work into named stages even when we technically could cram it into one.
+When something breaks, you instantly see *where* — "Test failed" tells you far more than "the build failed". On a real pipeline with checkout, build, test, package and deploy stages, that pinpointing saves a lot of time, and it's why we split work into named stages even when we technically could cram it all into one.
 
-**HANDS ON (remaining time)** <br>
-1. Create `hello-pipeline` and get the two-stage version running with a green Stage View.
-2. Add a **third** stage called `Package` that just echoes a message.
+**HANDS ON (20 min)** <br>
+*(All in the Jenkins UI — the `hello-pipeline` job)*
+1. Create `hello-pipeline` and get the two-stage version above running with a green Stage View.
+2. Add a **third** stage called `Package` that echoes a message.
 3. Make one of the `sh` steps deliberately fail — change it to `sh 'exit 1'` — rebuild, and watch that stage go **red** and the stages *after* it **not run at all**. This is the single most important thing a pipeline does: **stop the line when something's wrong, before the broken thing goes any further.** Then fix it back to green.
 **END OF NOTE**
+
+**Solution**
+
+```groovy
+pipeline {
+    agent any
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building the application...'
+                sh 'echo "pretend build step running"'
+            }
+        }
+        stage('Test') {
+            steps {
+                echo 'Running the tests...'
+                sh 'exit 1'          // step 3: deliberately fail here
+            }
+        }
+        stage('Package') {           // step 2: the third stage
+            steps {
+                echo 'Packaging the application...'
+            }
+        }
+    }
+}
+```
+
+With `sh 'exit 1'` in Test, the Stage View shows: **Build = green**, **Test = red**, **Package = grey/skipped** — it never ran. Change `sh 'exit 1'` back to `sh 'echo "pretend tests passing"'` and all three go green.
+
+---
+
+**Challenge**
+
+*Direct* students, **in pairs**, to write a declarative pipeline that does the following:
+
+* Has **three** stages, named `Checkout`, `Test` and `Deploy`
+* Each stage prints a message saying what it's doing
+* The `Deploy` stage additionally prints **which build number** it is deploying, using Jenkins' built-in `$BUILD_NUMBER`
+* The `Test` stage must run a real shell command (using `sh`), not just an `echo`
+* **OPTIONAL** — make the pipeline fail in `Test` on **even-numbered builds only**, so you can watch it alternate between green and red on successive runs
+
+*Provide* this example Console Output for a successful third build as an aid:
+
+```
+Checking out the code...
+Running the tests...
+tests passed
+Deploying build number 3
+```
+
+*Grant* students ~10 minutes.
+
+Hints to offer if they're stuck: remember **double quotes** are needed for `${BUILD_NUMBER}` to be substituted by Groovy. For the optional part, the shell has a modulo operator — `$((BUILD_NUMBER % 2))` gives 0 for even numbers.
+
+**SOLUTION**
+
+```groovy
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out the code...'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running the tests...'
+                sh 'echo "tests passed"'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                // Double quotes so Groovy substitutes the build number in
+                echo "Deploying build number ${BUILD_NUMBER}"
+            }
+        }
+    }
+}
+```
+
+**SOLUTION (optional extension — fails on even builds)**
+
+```groovy
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out the code...'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Running the tests...'
+                // $((BUILD_NUMBER % 2)) is 0 on even builds.
+                // The shell 'if' and 'exit 1' are exactly what you wrote in the bash session.
+                sh '''
+                    if [ $((BUILD_NUMBER % 2)) -eq 0 ]; then
+                      echo "Even build - failing on purpose"
+                      exit 1
+                    else
+                      echo "tests passed"
+                    fi
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo "Deploying build number ${BUILD_NUMBER}"
+            }
+        }
+    }
+}
+```
+
+Two things to draw out when revealing this:
+* The **triple single quotes** `'''...'''` let you write a multi-line shell script inside a single `sh` step. Very common in real pipelines.
+* The `if`, the `[ ]` test brackets, `-eq`, and `exit 1` are all **exactly** what students wrote in the bash session — nothing new. A pipeline is mostly a wrapper around the shell skills they already have.
+
+Run it three or four times and watch it alternate red, green, red, green — and notice `Deploy` is skipped every time `Test` goes red.
 
 <br>
 <br>
@@ -417,7 +747,6 @@ When something breaks, you instantly see *where* — "Test failed" tells you far
 
 <br>
 <br>
-
 ### 14:00–14:45 — Anatomy of a Pipeline: Stages, Environment, Post, Parallel
 *(Talk + short exercise)*
 
@@ -444,7 +773,12 @@ pipeline {
 }
 ```
 
-The `environment { }` block defines variables available to every stage. Change `APP_NAME` in one place and it updates everywhere.
+Unpacking the new bits:
+- `environment { }` — a block that defines variables available to **every** stage in the pipeline
+- `APP_NAME = 'countries-api'` — assignment. Note Groovy **does** use spaces around `=`, unlike bash
+- `echo "${GREETING} ${APP_NAME}..."` — **double quotes**, because we want the values substituted in. Single quotes here would print the literal text `${GREETING} ${APP_NAME}`
+
+Change `APP_NAME` in one place and it updates everywhere it's used.
 
 **ASK** <br>
 Where have you already used this exact idea — declaring a value once at the top and referring to it by name throughout? <br>
@@ -471,7 +805,15 @@ pipeline {
 }
 ```
 
-Once a pipeline has `parameters`, the job's button changes from **Build Now** to **Build with Parameters**, and Jenkins prompts for a value each time. Handy for "deploy to dev vs prod".
+- `parameters { }` — declares inputs the user supplies when starting a build
+- `string(name: ..., defaultValue: ..., description: ...)` — this is a **function call with named arguments**. The `name:` bits are labels, so the order doesn't matter and it's self-documenting. Other types exist too: `booleanParam`, `choice`
+- `${params.ENVIRONMENT}` — parameters live under `params.`, so you must write the prefix
+
+Once a pipeline has `parameters`, the job's button changes from **Build Now** to **Build with Parameters**, and Jenkins prompts you for a value each time.
+
+**NOTE FOR TRAINERS** <br>
+Flag this gotcha before students hit it: the **first** build after adding a `parameters` block still runs with defaults and shows a plain "Build Now" — Jenkins has to run the pipeline once to *discover* the parameters exist. From the second build onwards you get the prompt. Students reliably think they've done it wrong. <br>
+**END OF NOTE**
 
 **The `post` section — do something after, based on the outcome**
 
@@ -489,7 +831,7 @@ pipeline {
 
     post {
         success {
-            echo 'It worked! 🎉'
+            echo 'It worked!'
         }
         failure {
             echo 'It broke — someone needs to look at this.'
@@ -501,7 +843,11 @@ pipeline {
 }
 ```
 
-The `post` block runs *after* all your stages. `success` only runs if everything passed, `failure` only if something broke, `always` runs no matter what.
+The `post` block sits **outside** `stages` and runs *after* all of them finish. Inside it:
+- `success { }` — runs only if everything passed
+- `failure { }` — runs only if something broke
+- `always { }` — runs no matter what (good for cleanup, or publishing test reports)
+- (`unstable` and `changed` also exist — `changed` fires only when the result differs from the previous build)
 
 **ASK** <br>
 In a real team, what would you actually want in that `failure` block instead of an `echo`? <br>
@@ -525,6 +871,8 @@ stages {
 }
 ```
 
+The `parallel { }` block replaces the `steps { }` block of a stage, and contains **nested stages** that all run at once. The outer stage isn't finished until every branch inside it completes.
+
 **ASK** <br>
 Why would we run unit tests and linting in parallel rather than one after the other? <br>
 **ANSWER** <br>
@@ -539,12 +887,82 @@ Why is that a perfect fit for the Pull Request workflow we discussed in the Azur
 **ANSWER** <br>
 Because every feature branch and every open PR automatically gets its own build and test run, with zero manual job-creation. That's exactly the mechanism behind "run the tests on every PR before we allow a merge" — and later, "run `terraform plan` on every PR so a reviewer can see what would change." We won't wire it up today, but know the term.
 
-**HANDS ON (remaining time)** <br>
+**HANDS ON (20 min)** <br>
+*(All in the Jenkins UI — the `hello-pipeline` job → **Configure**)*
+
 Take your `hello-pipeline` and, one at a time, add:
-1. An `environment` block with an `APP_NAME`, and use it inside a stage's `echo`.
+1. An `environment` block with an `APP_NAME`, and use it inside a stage's `echo`. Make sure you use **double quotes**.
 2. A `post` section with `success`, `failure` and `always` blocks. Then make a step fail (`sh 'exit 1'`) and confirm `failure` and `always` run but `success` does not. Fix it and confirm the opposite.
-3. A `parameters` block with a `string` parameter, and echo `params.YOURPARAM` in a stage. Notice the button change to **Build with Parameters**.
+3. A `parameters` block with a `string` parameter, and echo `params.YOURPARAM` in a stage. Build **twice**, and notice the button change to **Build with Parameters** on the second run.
+4. (Stretch) Convert your `Test` stage into a `parallel` block containing two nested stages.
 **END OF NOTE**
+
+**Solution**
+
+All four combined into one pipeline:
+
+```groovy
+pipeline {
+    agent any
+
+    // 1. Variables available to every stage
+    environment {
+        APP_NAME = 'countries-api'
+    }
+
+    // 3. Input supplied when the build starts
+    parameters {
+        string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Which environment to target')
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                echo "Building ${APP_NAME}..."          // double quotes = value substituted
+            }
+        }
+
+        // 4. Stretch: two checks running at the same time
+        stage('Checks') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        echo 'Running unit tests...'
+                        sh 'echo "unit tests passed"'
+                    }
+                }
+                stage('Linting') {
+                    steps {
+                        echo 'Running the linter...'
+                        sh 'echo "no lint errors"'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo "Deploying ${APP_NAME} to ${params.ENVIRONMENT}"
+            }
+        }
+    }
+
+    // 2. Runs after all stages, based on the outcome
+    post {
+        success {
+            echo "${APP_NAME} build ${BUILD_NUMBER} succeeded"
+        }
+        failure {
+            echo "${APP_NAME} build ${BUILD_NUMBER} FAILED"
+        }
+        always {
+            echo 'Pipeline finished — pass or fail.'
+        }
+    }
+}
+```
+
+To test step 2, temporarily change one step to `sh 'exit 1'` and rebuild. In the Console Output you'll see the **`failure`** and **`always`** messages, but **not** `success`. Change it back and you'll see `success` and `always`, but not `failure`.
 
 <br>
 <br>
@@ -556,13 +974,18 @@ Our `Jenkinsfile` is still pasted into the Jenkins UI — which has the *exact s
 
 **Pulling the `Jenkinsfile` from Git**
 
-Instead of pasting the script, we point Jenkins at a Git repo and tell it "the `Jenkinsfile` is in there":
+Instead of pasting the script, we point Jenkins at a Git repo and tell it "the `Jenkinsfile` is in there".
 
-- On a Pipeline job: **Configure** > **Pipeline** section > change **Definition** to **Pipeline script from SCM**
-- **SCM**: Git
+*(In the Jenkins UI — a Pipeline job → **Configure**)*
+- Scroll to the **Pipeline** section
+- Change **Definition** from `Pipeline script` to **Pipeline script from SCM**
+
+*(SCM stands for "Source Control Management" — Jenkins' generic term for Git and its older cousins.)*
+
+- **SCM**: `Git`
 - **Repository URL**: your fork of the starter repo
-- **Branch Specifier**: `*/main`
-- **Script Path**: `Jenkinsfile` (the default — the file at the repo root)
+- **Branch Specifier**: `*/main` — the `*/` prefix is Jenkins shorthand meaning "the `main` branch from whichever remote", so `*/main` matches `origin/main`
+- **Script Path**: `Jenkinsfile` — the path to the file within the repo. The default assumes it's at the repo root
 
 Now the pipeline definition lives in Git: versioned, reviewable in a Pull Request, and identical for anyone who runs it. This is the whole reason pipeline-as-code beats clicking.
 
@@ -570,8 +993,9 @@ Now the pipeline definition lives in Git: versioned, reviewable in a Pull Reques
 
 To pull a private repo (or push to Docker Hub later), Jenkins needs secrets. We never paste those into a config box or, worse, into the `Jenkinsfile` in Git. We use Jenkins' **Credentials** store.
 
-- **Manage Jenkins > Credentials > System > Global credentials > Add Credentials**
-- We'll set one up properly together in the capstone.
+*(In the Jenkins UI — Dashboard)*
+- **Manage Jenkins → Credentials → System → Global credentials (unrestricted) → Add Credentials**
+- We'll set one up properly together in the capstone
 
 **ASK** <br>
 Why store a token in the Credentials vault instead of just typing it into the repository URL field, or the `Jenkinsfile`? <br>
@@ -582,8 +1006,8 @@ The vault keeps the secret out of both the job config *and* out of Git, it autom
 
 The magic of CI is that nobody clicks "Build". A change to Git triggers it. Two ways:
 
-- **Poll SCM** — Jenkins checks the repo on a schedule (cron syntax again) and builds only if something changed. Simple, works everywhere, but there's a delay and it's a bit wasteful.
-- **Webhook** — GitHub *tells* Jenkins the instant a push happens. Instant, efficient, and how real setups do it.
+- **Poll SCM** — Jenkins checks the repo on a schedule (cron syntax again) and builds only if something changed. Simple, works everywhere, but there's a delay and it's a bit wasteful
+- **Webhook** — GitHub *tells* Jenkins the instant a push happens. Instant, efficient, and how real setups do it
 
 **ASK** <br>
 Between polling every minute and a webhook, which is better, and why? <br>
@@ -591,7 +1015,7 @@ Between polling every minute and a webhook, which is better, and why? <br>
 The webhook. Polling means Jenkins repeatedly asks "anything changed yet?" when the answer is almost always no — wasted checks, plus a delay of up to the polling interval. A webhook means GitHub notifies Jenkins the moment something actually happens: no waste, no delay.
 
 **NOTE FOR TRAINERS** <br>
-Here's the local-laptop reality: a webhook from GitHub can't reach `http://localhost:8080` on a student's machine, because GitHub is on the public internet and their Jenkins isn't. The proper fix is a tunnel like [ngrok](https://ngrok.com/), which is a great optional stretch. For the guaranteed-to-work classroom path, we use **Poll SCM** in the capstone — it needs no networking magic and demonstrates the same "builds trigger themselves from Git" principle. Teach the webhook as the concept and the goal; use polling as the reliable hands-on. <br>
+Here's the local-laptop reality: a webhook from GitHub **cannot** reach `http://localhost:8080` on a student's machine, because GitHub is on the public internet and their Jenkins isn't. The proper fix is a tunnel like [ngrok](https://ngrok.com/), which is a great optional stretch. For the guaranteed-to-work classroom path, we use **Poll SCM** in the capstone — it needs no networking magic and demonstrates the same "builds trigger themselves from Git" principle. Teach the webhook as the concept and the goal; use polling as the reliable hands-on. <br>
 **END OF NOTE**
 
 <br>
@@ -601,7 +1025,6 @@ Here's the local-laptop reality: a webhook from GitHub can't reach `http://local
 
 <br>
 <br>
-
 ### 15:15–16:45 — Capstone: A Real Test → Build → Push Pipeline
 *(Exercise — 1 hour 30 minutes)*
 
@@ -613,23 +1036,52 @@ Work individually or in pairs. Get the core pipeline green first; the stretch go
 
 #### Part 0 (≈10 min) — Get the app and a Docker Hub token ready
 
-1. In your forked starter repo you have a small Node app with a `package.json`, a trivial test (`npm test` passes), and a `Dockerfile`. Clone it locally if you haven't, and have a look at those three files so you know what the pipeline will be acting on. (If you'd rather, use the `countries` app you scaffolded in the bash session — it already has a `Dockerfile`.)
-2. On **Docker Hub**: go to **Account Settings > Security > New Access Token**, create one with **Read & Write**, and copy it somewhere safe for a minute. This is what the pipeline pushes with — never your account password.
+**1. Clone your fork.**
+
+*(Run from `~/jenkins-training`)*
+```bash
+git clone https://github.com/<your-username>/<your-fork>.git
+cd <your-fork>
+```
+
+*(Run from `~/jenkins-training/<your-fork>`)*
+```bash
+ls
+cat package.json
+cat Dockerfile
+```
+
+You have a small Node app with a `package.json`, a trivial test (`npm test` passes), and a `Dockerfile`. Have a proper look at those three files so you know what the pipeline will be acting on. *(If you'd rather, use the `countries` app you scaffolded in the bash session — it already has a `Dockerfile`.)*
+
+**2. Get a Docker Hub access token.**
+
+*(In your browser — [hub.docker.com](https://hub.docker.com))*
+- **Account Settings → Security → New Access Token**
+- Give it a description, set permissions to **Read & Write**, click **Generate**
+- **Copy it now** — Docker Hub only shows it once
+
+This token is what the pipeline pushes with — **never** your account password. A token can be revoked on its own without changing your login.
 
 #### Part 1 (≈15 min) — Store your Docker Hub credentials in Jenkins
 
-1. **Manage Jenkins > Credentials > System > Global credentials > Add Credentials**
-2. **Kind**: Username with password
-3. **Username**: your Docker Hub username
-4. **Password**: the access token you just created
-5. **ID**: `dockerhub-credentials` (we'll refer to this exact ID from the `Jenkinsfile`)
-6. Save.
+*(In the Jenkins UI — Dashboard)*
+- **Manage Jenkins → Credentials → System → Global credentials (unrestricted) → Add Credentials**
+- **Kind**: `Username with password`
+- **Username**: your Docker Hub username
+- **Password**: the access token you just generated
+- **ID**: `dockerhub-credentials` ← **this exact string**, because the `Jenkinsfile` refers to it by ID
+- **Description**: anything helpful, e.g. "Docker Hub push token"
+- Click **Create**
 
 **Checkpoint question — ask yourself:** why did we put the token *here* and not in the `Jenkinsfile` we're about to write and push to Git?
 
 #### Part 2 (≈35 min) — Write the pipeline
 
-Create a file called `Jenkinsfile` at the root of your repo with this content, replacing `your-dockerhub-username`:
+*(Run from `~/jenkins-training/<your-fork>`)*
+- Run: `touch Jenkinsfile`
+- Then open it: `code Jenkinsfile`
+
+Paste this in, replacing `your-dockerhub-username`:
 
 ```groovy
 pipeline {
@@ -691,36 +1143,194 @@ pipeline {
 
 Let me walk through the new pieces, because each connects to something you already know:
 
-- **`checkout scm`** — checks out the same repo the `Jenkinsfile` came from. When the pipeline runs from Git, this pulls the code automatically.
-- **the `Install & Test` stage has its own `agent { docker { image 'node:20' } }`** — this stage runs *inside a fresh `node:20` container*. That's huge: the stage gets a clean, correct Node environment every time, with no need to install Node on the Jenkins host. It's the "disposable, identical environment per build" idea from the Docker session, applied to CI.
-- **`$IMAGE_TAG` = `$BUILD_NUMBER`** — every image is tagged with the build number, so you can trace exactly which build produced which image. That's the `$BUILD_NUMBER` you met this morning, now doing real work.
-- **`withCredentials`** — pulls your Docker Hub secret out of the vault *only* for the steps inside it, binds it to `DOCKER_USER`/`DOCKER_PASS`, and masks it in the logs. `--password-stdin` avoids the password ever appearing on a command line.
+**`checkout scm`** — a built-in step meaning "check out the same repository this `Jenkinsfile` came from". You don't have to specify the URL again; Jenkins already knows it. `scm` here is a variable Jenkins provides holding your source-control config.
 
-Commit and push this `Jenkinsfile` to your fork.
+**A stage with its own `agent`:**
+```groovy
+stage('Install & Test') {
+    agent {
+        docker { image 'node:20' }
+    }
+```
+The pipeline's top-level `agent any` sets the default, but **an individual stage can override it**. Here, this stage runs *inside a freshly-started `node:20` container*. Jenkins pulls the image, starts it, mounts the workspace in, runs the steps, then throws the container away. That's huge: the stage gets a clean, correct Node environment every time, and you never have to install Node on the Jenkins host. It's the "disposable, identical environment per build" idea from the Docker session, applied to CI.
+
+**Tagging with the build number:**
+```groovy
+IMAGE_TAG  = "${BUILD_NUMBER}"
+```
+Every image gets tagged with the build number that produced it, so you can trace any running container back to an exact build. That's the `$BUILD_NUMBER` you met this morning, now doing real work.
+
+**Note the two quoting styles in play.** In `environment`, we use Groovy double quotes so `${BUILD_NUMBER}` is substituted. But in `sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'` we use **single** quotes with `$VAR` — here the *shell* does the substitution, because Jenkins exports everything in `environment` as real shell environment variables. Both work; single quotes in `sh` steps are actually safer, because the value never gets baked into the command Groovy builds (which matters for secrets — see below).
+
+**`withCredentials` — the vault, used properly:**
+```groovy
+withCredentials([usernamePassword(
+    credentialsId: 'dockerhub-credentials',
+    usernameVariable: 'DOCKER_USER',
+    passwordVariable: 'DOCKER_PASS'
+)]) {
+    // secrets exist ONLY inside this block
+}
+```
+- `credentialsId:` — matches the **ID** you set in Part 1
+- `usernameVariable:` / `passwordVariable:` — the names the values get bound to
+- Everything inside the `{ }` can use `$DOCKER_USER` and `$DOCKER_PASS`; **outside the block they don't exist**
+- Jenkins automatically **masks** these values in the console log — you'll see `****` instead of the token
+
+**`--password-stdin`:**
+```bash
+echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+```
+That's the pipe from your bash session. Rather than putting the password on the command line (where it could appear in process listings or logs), we pipe it into `docker login` via standard input. Standard security practice.
+
+Now commit and push:
+
+*(Run from `~/jenkins-training/<your-fork>`)*
+```bash
+git add Jenkinsfile
+git commit -m "Add build and push pipeline"
+git push origin main
+```
 
 #### Part 3 (≈20 min) — Point Jenkins at it and run it
 
-1. **New Item** > `build-and-push` > **Pipeline** > OK.
-2. **Pipeline** section > **Definition**: **Pipeline script from SCM** > **Git** > your fork's URL > branch `*/main` > **Script Path**: `Jenkinsfile`.
-3. **Build Triggers** > tick **Poll SCM** > schedule `H/2 * * * *` (checks every couple of minutes).
-4. **Save**, then **Build Now** for the first run.
-5. Watch the Stage View march through Checkout → Install & Test → Build Image → Push Image. When it's green, go to your **Docker Hub** account and confirm the image is there, tagged with the build number.
-6. Now make a trivial change in your repo (edit the README), commit and push, and **wait** — within a couple of minutes Poll SCM should kick off a build **on its own**. That moment — a build you didn't start, triggered purely by a Git push — is CI working. Sit with it; that's the whole point of the day.
+*(In the Jenkins UI — Dashboard)*
+1. **New Item** → name it `build-and-push` → select **Pipeline** → **OK**
+2. Scroll to the **Pipeline** section:
+   - **Definition**: `Pipeline script from SCM`
+   - **SCM**: `Git`
+   - **Repository URL**: your fork's HTTPS URL
+   - **Branch Specifier**: `*/main`
+   - **Script Path**: `Jenkinsfile`
+3. Scroll up to **Build Triggers** → tick **Poll SCM** → **Schedule**: `H/2 * * * *` (checks every couple of minutes)
+4. **Save**, then **Build Now** for the first run
+5. Watch the **Stage View** march through Checkout → Install & Test → Build Image → Push Image
+
+*(In your browser — [hub.docker.com](https://hub.docker.com))*
+6. When it's green, go to your Docker Hub repositories and confirm the image is there, tagged with the build number
+
+Now the moment that matters:
+
+*(Run from `~/jenkins-training/<your-fork>`)*
+```bash
+echo "A trivial change" >> README.md
+git add README.md
+git commit -m "Trigger the pipeline"
+git push origin main
+```
+
+Then **wait**. Within a couple of minutes, Poll SCM kicks off a build **on its own**. That — a build you didn't start, triggered purely by a Git push — is CI working. Sit with it; that's the whole point of the day.
 
 **ASK** *(mid-capstone checkpoint, ~16:15)* <br>
 Look at the order of your stages: Test comes *before* Build and Push. Why does that order matter — what does putting Test first actually protect you from? <br>
 **ANSWER** <br>
-If the tests fail, the pipeline stops right there and **never builds or pushes the image**. A broken version can't reach Docker Hub, because the gate caught it first. That's the "stop the line before the bad thing ships" principle — the same reason your bash `containerise` script checked exit codes. Ordering stages so the cheap checks fail fast, before the expensive/irreversible steps, is a core pipeline design habit.
+If the tests fail, the pipeline stops right there and **never builds or pushes the image**. A broken version can't reach Docker Hub, because the gate caught it first. That's the "stop the line before the bad thing ships" principle — the same reason your bash `containerise` script checked exit codes. Ordering stages so the cheap checks fail fast, before the expensive or irreversible steps, is a core pipeline design habit.
 
 #### Part 4 — Stretch goals
 
 If you've got a green, self-triggering pipeline, level it up:
 
-1. **Prove the gate works.** Add a stage *before* Build that deliberately fails (`sh 'exit 1'`), push it, and confirm nothing gets built or pushed — the pipeline stops at the red stage. Then remove it. This is worth doing: *seeing* the pipeline refuse to ship broken code is more convincing than being told it will.
+1. **Prove the gate works.** Add a stage *before* Build Image that deliberately fails (`sh 'exit 1'`), push it, and confirm nothing gets built or pushed. Then remove it. Worth doing — *seeing* the pipeline refuse to ship broken code is more convincing than being told it will.
 2. **Add a `latest` tag.** In the Push stage, also tag and push `$IMAGE_NAME:latest` alongside the numbered tag, so there's always a "newest" image.
-3. **Parallelise the checks.** If you add a linting step, run it in `parallel` with the tests.
-4. **Notify on failure.** Even just a richer `echo` in the `failure` block that prints `${IMAGE_NAME}` and the build URL — then read about the Slack/email plugins that would do this for real.
-5. **Webhook instead of polling** (advanced): install `ngrok`, expose your local Jenkins, and set up a GitHub webhook so pushes trigger builds *instantly* instead of on a 2-minute poll.
+3. **Parallelise the checks.** Add a linting step and run it in `parallel` with the tests.
+4. **Notify on failure.** Enrich the `failure` block to print the image name and the build URL, then read about the Slack/email plugins that would do this for real.
+5. **Webhook instead of polling** (advanced): install `ngrok`, expose your local Jenkins, and set up a GitHub webhook so pushes trigger builds *instantly*.
+
+**Solution**
+
+**Stretch 1 — proving the gate.** Insert this stage between `Install & Test` and `Build Image`:
+
+```groovy
+stage('Deliberate Failure') {
+    steps {
+        echo 'About to fail on purpose...'
+        sh 'exit 1'
+    }
+}
+```
+
+Push it, and the Stage View shows Checkout ✅ → Install & Test ✅ → Deliberate Failure ❌ → **Build Image and Push Image never run**. Check Docker Hub: no new tag. Delete the stage and push again to go green.
+
+**Stretch 2 — a `latest` tag as well.** Replace the Push Image stage's steps:
+
+```groovy
+stage('Push Image') {
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'dockerhub-credentials',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+        )]) {
+            sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+            sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
+
+            // Point 'latest' at this same image, then push that tag too
+            sh 'docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest'
+            sh 'docker push $IMAGE_NAME:latest'
+        }
+    }
+}
+```
+
+**Stretch 3 — parallel checks.** Replace the `Install & Test` stage with:
+
+```groovy
+stage('Checks') {
+    agent {
+        docker { image 'node:20' }
+    }
+    steps {
+        sh 'npm install'
+    }
+}
+
+stage('Test & Lint') {
+    agent {
+        docker { image 'node:20' }
+    }
+    parallel {
+        stage('Unit Tests') {
+            steps {
+                sh 'npm test'
+            }
+        }
+        stage('Lint') {
+            steps {
+                sh 'echo "linting..." && npm run lint || echo "no lint script configured"'
+            }
+        }
+    }
+}
+```
+
+*(Note the `|| echo ...` — the `||` from your bash session, used here so a missing `lint` script doesn't fail the build while you're experimenting.)*
+
+**Stretch 4 — a more useful failure message:**
+
+```groovy
+post {
+    success {
+        echo "Done! Pushed ${IMAGE_NAME}:${IMAGE_TAG} to Docker Hub."
+    }
+    failure {
+        echo "FAILED building ${IMAGE_NAME}:${IMAGE_TAG}"
+        echo "Full log: ${BUILD_URL}console"
+    }
+    always {
+        echo "Build ${BUILD_NUMBER} finished with status: ${currentBuild.currentResult}"
+    }
+}
+```
+
+`currentBuild.currentResult` is a built-in Jenkins object holding this build's outcome — `SUCCESS`, `FAILURE`, or `UNSTABLE`.
+
+**Stretch 5 — ngrok webhook (outline).**
+
+*(Run from `~/jenkins-training`)*
+```bash
+ngrok http 8080
+```
+Copy the `https://....ngrok-free.app` address it prints. Then *(in your browser, on GitHub)*: **your fork → Settings → Webhooks → Add webhook**, with **Payload URL** = `https://....ngrok-free.app/github-webhook/` (the trailing slash matters), **Content type** = `application/json`, **Just the push event**. Finally *(in the Jenkins UI)*: **Configure** the job → **Build Triggers** → untick Poll SCM, tick **GitHub hook trigger for GITScm polling**. Push a commit and the build starts within a second or two.
 
 #### What to show at 16:45
 
@@ -737,6 +1347,8 @@ You started this morning with a definition — CI/CD is about replacing scary, m
 
 Then you made it real. You installed Jenkins on your own laptop, ran your first job, and watched the crucial shift from clicking a job together in the UI to describing it as a `Jenkinsfile` in Git — reviewable, versioned, repeatable, the same "as code" principle behind every tool in this course. And in the capstone you built the genuine article: a pipeline that, on a git push, tests an app, builds an image, and ships it to a registry, all on its own — refusing to push anything if the tests fail.
 
+And notice how much of today was actually just **bash skills wearing a Jenkins hat**. Every `sh` step, every `exit 1`, every `||`, every pipe into `docker login` — that was last session's material. The pipeline is the wrapper; the shell is still doing the work.
+
 **ASK** <br>
 Look at the shape of that capstone pipeline: checkout, then a stage that tests, then a stage that changes something real, then a stage that ships it — with credentials pulled from the vault and a `post` block reporting the outcome. If we wanted this *same* pipeline to run **Terraform against Azure** instead of building a Docker image, how much would actually have to change? <br>
 **ANSWER** <br>
@@ -748,7 +1360,15 @@ Where this sits in the course:
 - **Kubernetes** — running and scaling the images your pipeline now builds
 - **Integration** — everything woven together: a push to Git flowing through test, build, provision and deploy, automatically and safely
 
-**Q&A** — take remaining questions. And remind everyone to `docker stop jenkins` when they're done if they want their laptop's resources back — the named volume means it'll all still be there next time with `docker start jenkins`.
+**Q&A** — take remaining questions.
+
+**Before everyone leaves** — remind them how to stop and restart Jenkins without losing anything:
+
+*(Run from anywhere)*
+```bash
+docker stop jenkins     # frees up your laptop's resources
+docker start jenkins    # everything is still there, thanks to the named volume
+```
 
 <br>
 <br>
@@ -757,12 +1377,66 @@ Where this sits in the course:
 
 Before the next session, individually or in pairs:
 
-1. From scratch, in a brand new folder, get Jenkins running and build a two-stage pipeline from memory — no notes. Rebuilding is the fastest way to make it stick.
-2. Take the capstone pipeline and add a **`Package` stage** between Test and Build that just prints the version being built — practising adding a stage cleanly.
+1. From scratch, in a brand new folder, get Jenkins running and build a two-stage pipeline **from memory** — no notes. Rebuilding is the fastest way to make it stick.
+2. Take the capstone pipeline and add a **`Package` stage** between Test and Build Image that prints the version being built — practising adding a stage cleanly.
 3. Add a `parameters` block letting you pass in the image tag manually, defaulting to the build number, and use it in the Build and Push stages.
 4. Write a short paragraph, in your own words, explaining the difference between Continuous Delivery and Continuous Deployment, with an example of a team that would prefer each.
 5. (Stretch) Set up `ngrok` and a GitHub webhook so a push triggers your pipeline **instantly**, and compare the feel against Poll SCM.
 6. (Stretch) Read the [Jenkins Pipeline syntax docs](https://www.jenkins.io/doc/book/pipeline/syntax/) and find one directive we didn't cover today (e.g. `when`, `options`, `tools`) — work out what it does and where you'd use it.
+
+**Solution** *(for the guided ones — 2, 3, 6)*
+
+**Take-home 2** — the `Package` stage, inserted between Test and Build Image:
+
+```groovy
+stage('Package') {
+    steps {
+        echo "Packaging ${IMAGE_NAME} version ${IMAGE_TAG}"
+        sh 'echo "Contents about to be packaged:" && ls -la'
+    }
+}
+```
+
+**Take-home 3** — a parameterised image tag. Note the `?:` operator, Groovy's "Elvis operator": it means "use the left value, **or** the right one if the left is empty" — the same idea as bash's `${2:-default}`.
+
+```groovy
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'IMAGE_TAG_OVERRIDE', defaultValue: '', description: 'Leave blank to use the build number')
+    }
+
+    environment {
+        IMAGE_NAME = "your-dockerhub-username/hello-pipeline-app"
+        IMAGE_TAG  = "${params.IMAGE_TAG_OVERRIDE ?: BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Build Image') {
+            steps {
+                echo "Building ${IMAGE_NAME}:${IMAGE_TAG}"
+                sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
+            }
+        }
+    }
+}
+```
+
+**Take-home 6** — the most useful directive we didn't cover is `when`, which makes a stage **conditional**:
+
+```groovy
+stage('Deploy to Production') {
+    when {
+        branch 'main'      // only run this stage on the main branch
+    }
+    steps {
+        echo 'Deploying to production...'
+    }
+}
+```
+
+You'd use it so that feature branches get built and tested, but only `main` actually deploys — a very common real-world pattern.
 
 <br>
 <br>
