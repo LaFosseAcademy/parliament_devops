@@ -800,15 +800,19 @@ Here's the shift. A script is a tool. **Automation** is the discipline of making
 
 Think back to the DevOps habits from the Azure session — "automate the boring, repeatable stuff", "small frequent changes", "everything as code". Scripts are how those habits actually get realised. That scaffold script you wrote means every new service in your team starts identically. Later, a build script will mean every image is built and pushed identically. A deploy script will mean every release happens identically. Once the steps live in a script, they can be:
 
+# EMILE NOTE
+- Explain `cron`
+- Explain `lingua franca`
+
 - **Reviewed** — a teammate reads the script in a pull request before it ever runs
 - **Version-controlled** — you can see exactly how the process changed over time, and roll it back
-- **Triggered automatically** — by a schedule (`cron`, which some of you have met), or by an event like "someone pushed to `main`" (that's Jenkins, in a couple of sessions)
+- **Triggered automatically** — by a schedule `cron`, or by an event like "someone pushed to `main`" (that's Jenkins, in a couple of sessions)
 - **Run anywhere** — your laptop, a colleague's, a build server, a cloud shell — and behave the same
 
 **ASK** <br>
 We could keep doing all of this by hand and get the same *result* on any given day. So what does moving it into automated scripts actually buy a DevOps team — beyond just saving a bit of typing? <br>
 **ANSWER** <br>
-Consistency and safety at scale. Humans doing repetitive steps by hand drift — they skip a step, do them out of order, or do it slightly differently on server #23. A script does it identically every time, leaves a reviewable record of *what* runs, fails loudly when something's wrong (exit codes), and can run without anyone present. The value isn't the saved keystrokes; it's that the process becomes reliable and auditable.
+Consistency and safety at scale. Humans doing repetitive steps by hand drift — they skip a step, do them out of order, or do it slightly differently on server. A script does it identically every time, leaves a reviewable record of *what* runs, fails loudly when something's wrong (exit codes), and can run without anyone present. The value isn't the saved keystrokes; it's that the process becomes reliable and auditable.
 
 Now — bash is the lingua franca of Linux, and it's most of what a DevOps engineer scripts. But it's not the only shell you'll meet, especially in a Microsoft-heavy environment like Azure. So for the next stretch we're going to step into **PowerShell**, right inside the Azure Cloud Shell, and see both how it's similar and how it's fundamentally different.
 
