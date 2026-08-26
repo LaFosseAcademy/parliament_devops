@@ -636,7 +636,7 @@ Why might an organisation want several subscriptions, rather than more resource 
 
 I'm signed in via my own account. My subscription is **Azure subscription 1**, with an ID, and a **Parent management group** — all defaults.
 
-![azure-fundamentals-2](../slidee/images/01-cloud-azure-fundamentals/azure_subscription_1.png)
+![azure-fundamentals-2](../slidee/images/01-cloud-azure-fundamentals/azure_subscription_1.png) <br>
 ![azure-fundamentals-2](../slidee/images/01-cloud-azure-fundamentals/azure_subscription_2.png)
 
 Now the bit that catches people out later.
