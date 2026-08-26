@@ -266,17 +266,22 @@ Full day, **09:00–17:00**, with a one-hour lunch and three 15-minute breaks.
 
 ### 09:00–09:15 — Welcome & Introductions
 
-Morning everyone, welcome. Today's the first of a run of sessions that'll take you from the basics through to actually being able to build, automate and ship infrastructure the way a real engineering team does it.
+Morning everyone, welcome. Today's the first of a run of sessions that'll take you from the basics through to actually being able to build, automate and ship infrastructure the way a real DevOps engineering team does it.
 
 Quick framing, because it matters for how I pitch this. **You are not beginners.** You can build a REST API in Express, structure it properly with MVC, put it behind a database, write tests for it, containerise it with Docker and manage the whole thing in Git. That's a lot.
 
-What you haven't done — most of you — is **run** any of it. Someone else has always handled where it lives, how it gets there, who's allowed to touch it, and what happens at 3am when it falls over. That's the gap this course fills, and it's a job, not an afterthought.
+What you haven't done yet, from your project weeks is **run** any of it. Someone else has always handled where it lives, how it gets there, who's allowed to touch it, and what happens at 3am when it falls over. That's the gap this course fills, and it's a job, not an afterthought.
 
 Today is about two things. First: what actually *is* DevOps, and what does it change about how you work. Second: getting properly comfortable in Azure, because every future session assumes you know your way around it.
 
+There's a repo I want you to clone down now, it's going to have starter code and some resources for us to use throughout the Deep Dive. [Student Facing Repo](https://github.com/LaFosseAcademy/parliament_devops_student_facing/tree/main)
+
+You'll see two files:
+- `01-commands.md` - This is a guide for you go have, use throughout the training
+- `01-my-azure-details.md` - This is for you to populate throughout the course of the day. Other sections will need some information, id's etc.. which we'll find out today so make a note of them as we go through and it'll make our lives easier.                                                                     
 Full day. Lunch at 1 for an hour, and a 15-minute break roughly every ninety minutes — flag it if you need one sooner.
 
-**Before anything else — two commands**, so we find broken setups now rather than at 10:30:
+**Before anything else — two commands**, so you know where you're at.
 
 *(Run from anywhere)*
 ```bash
@@ -284,7 +289,7 @@ az --version
 az account show
 ```
 
-If the first errors, the CLI isn't installed. If the second errors, you're not signed in. Either way, flag it now — we'll fix both at 10:30, but I'd rather know who needs help before we get there.
+If the first errors, the CLI isn't installed. If the second errors, you're not signed in. Either way, we'll get up and running in a short while.
 
 <br>
 <br>
