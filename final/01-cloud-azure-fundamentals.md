@@ -297,7 +297,7 @@ If the first errors, the CLI isn't installed. If the second errors, you're not s
 
 Let's start with DevOps itself, before we touch a single Azure resource — because the tools we'll spend the rest of today and the coming sessions on only make sense once you understand the problem they exist to solve.
 
-Historically, software teams were split into two camps. **'Dev'** — the people who wrote application code — and **'Ops'** — the people who kept servers running, deployed changes, and got paged at 3am when something broke. These two teams had, in practice, opposite incentives. Dev were rewarded for shipping features fast. Ops were rewarded for stability, which usually meant resisting change, because change is what breaks things. That tension is a big part of why deployments used to be huge, dreaded, quarterly events — and why they went wrong so often when they did happen.
+Historically, software teams were split into two camps. **'Dev'** — the people who wrote application code — and **'Ops'** — the people who kept servers running, deployed changes, and got messaged or phoned at 3am when something broke. These two teams had, in practice, opposite incentives. Dev were rewarded for shipping features fast. Ops were rewarded for stability, which usually meant resisting change, because change is what breaks things. That tension is a big part of why deployments used to be huge, dreaded, quarterly events — and why they went wrong so often when they did happen.
 
 DevOps grew out of that dysfunction. There's a mantra that captures the core idea, and we'll come back to it more than once today:
 
@@ -904,15 +904,14 @@ My assumption is anything PDS builds stays within UK regions, for data integrity
 Start creating a **Storage account** (don't finish it) and open the **Region** dropdown on the Basics tab.
 - Count roughly how many UK-specific options there are
 - In a new tab, search "Azure regions map" and find where `uksouth` and `ukwest` physically sit
-- Discuss with the person next to you: if PDS only had UK users, is there ever a good reason to pick a non-UK region anyway?
+
+**ASK**<br>
+If PDS or a company, only had UK users, is there ever a good reason to pick a non-UK region anyway?
 
 Cancel out of the wizard when you're done — we're not creating this one.
 **END OF NOTE**
 
-**Solution**
-
-The discussion answers worth surfacing:
-
+**ANSWERS**<br>
 - **The service isn't available in the UK** — not every Azure service exists in every region, and new services often land in a handful first
 - **Cost** — pricing genuinely varies by region for the same resource
 - **Disaster recovery** — a deliberate second copy elsewhere
@@ -941,9 +940,9 @@ A VNet is divided into **subnets** — smaller address ranges within it, often s
 A **Network Security Group (NSG)** is a set of allow/deny rules — a basic firewall — controlling what traffic can reach a subnet or resource, based on port number and source IP.
 
 **ASK** <br>
-You've all run an Express app and a database locally, probably in Docker. When you write `docker compose` with an app and a Postgres container, which of those containers is reachable from the internet? <br>
+You've all run an Express app and a database locally. I showed you two microservices in Docker. When you write `docker compose` with an app and a Postgres container, which of those containers is reachable from the internet? <br>
 **ANSWER** <br>
-Only whichever one you published a port for. Postgres is reachable *by the app*, over the internal Docker network, but not from outside unless you explicitly mapped a port. **A VNet is that idea at cloud scale** — a private network where things reach each other by default, and exposure to the outside is something you deliberately configure. If Docker networking makes sense to you, VNets will.
+Only whichever one you published a port for. Postgres is reachable *through the app*, over the internal Docker network, but not from outside unless you explicitly mapped a port. **A VNet is that idea at cloud scale** — a private network where things reach each other by default, and exposure to the outside is something you deliberately configure. If Docker networking makes sense to you, VNets will.
 
 **ASK** <br>
 Why put database servers in a completely separate subnet from web servers, rather than everything in one? <br>
@@ -988,7 +987,7 @@ We max out at 255 per number because that's the largest value 8 bits can hold.
 Students with a computer science background will spot that "8 bits" is sometimes said as "8 bytes" in older notes. It's **bits** — 8 bits = 1 byte, and 4 bytes = 32 bits for the whole address. Worth being precise, because someone will notice and it undermines confidence in everything else if it's wrong. <br>
 **END OF NOTE**
 
-The point to land: subnets let you **isolate resources by type**, so you can apply different rules to each. On `pds-subnet-data`, this is where you'd say *"only allow traffic from IP addresses in our other subnet"* — which is exactly what we'll configure with Terraform in Session 6.
+The point to land: subnets let you **isolate resources by type**, so you can apply different rules to each. On `pds-subnet-data`, this is where you'd say *"only allow traffic from IP addresses in our other subnet"* — which is exactly what we'll configure with Terraform in a later session
 
 <br>
 <br>
@@ -1007,7 +1006,7 @@ We need a foundation in identity before we can talk about automation properly.
 
 #### Why authentication is the whole ballgame
 
-Before the mechanics, the principle — because this is the single most security-critical thing in the course.
+Before the mechanics, let's talk about the principle — because this is the single most security-critical thing in the course.
 
 Every action against Azure has to answer two questions: **who are you** (authentication) and **what are you allowed to do** (authorisation). Get either wrong and you have either a system nobody can use, or one anybody can destroy.
 
@@ -1038,7 +1037,10 @@ Four reasons, and they're all practical. It doesn't break when that person is on
 
 #### Creating one
 
-First get your subscription ID:
+Don't follow along with me right now. I've got some tasks I'll put into Slack in a moment.  
+
+
+First I'll need to get my subscription ID:
 
 ```bash
 az account show --query id -o tsv
@@ -1060,6 +1062,8 @@ Piece by piece:
 - `--scopes` — **where** that role applies. Here, the whole subscription
 
 It returns an `appId`, `displayName`, `password` and `tenant` — credentials a script, pipeline or tool authenticates with, entirely independently of any human login.
+
+I'm going to add these to my file: `my-azure-details.md`
 
 **⚠️ The `password` is shown once and never again.** Lose it and you generate a new one; the old is gone.
 
@@ -1155,12 +1159,11 @@ az role assignment list --assignee <appId> -o table
 
 Part B — the key observation:
 
-`example-automation-identity` appears on the **subscription's** IAM blade as a direct assignment. On the **resource group's** IAM blade it appears too — but marked as inherited (the Scope column reads the subscription, not this resource group).
+If I go to my Subscription and click onto **Access control (IAM)** -> **Role asingments** and search for `example-automation-identity` it's scoped as a direct assignment. 
 
-**ASK** <br>
-Given it has `Reader` at the subscription, do we expect to see it as an assignment made *at* `pds-deep-dive`? <br>
-**ANSWER** <br>
-No — **RBAC is inherited downward**. Granted once at the subscription, every resource group and resource beneath inherits it automatically. That's exactly why scope matters: grant at the highest point that still respects least privilege — no higher, and no lower than necessary. *(A "blade", incidentally, is just Microsoft's word for one of those sliding panels in the Portal.)*
+If I did the same on the **resource group's** IAM blade it appears too — but marked as inherited 
+
+**Role Based Access Control is inherited downward**. Granted once at the subscription, every resource group and resource beneath inherits it automatically. That's exactly why scope matters: grant at the highest point that still respects least privilege — no higher, and no lower than necessary. *(A "blade", incidentally, is just Microsoft's word for one of those sliding panels in the Portal.)*
 
 **If a student's `create-for-rbac` fails** with an authorisation error, they're likely on a corporate tenant where creating app registrations is restricted. On their own free-trial tenant it will work — they're the Global Administrator. This is a very useful live demonstration of the thing we're teaching, so use it rather than apologising for it.
 
@@ -1186,9 +1189,13 @@ This pattern — manually clicking through a cloud console to build infrastructu
 - **Tribal knowledge** — the exact steps often exist only in one engineer's head
 
 **ASK** <br>
-Every one of those problems has an equivalent in application code — and you already solved them. How? <br>
+Every one of those problems has an equivalent in application code, the software you've been working on — and you already solved them. How? <br>
 **ANSWER** <br>
-**Git.** Repeatability, history, review through pull requests, and knowledge shared in a repo rather than someone's memory. You've had the answer to all five for years; it just never occurred to anyone to apply it to servers. That's the entire premise of Infrastructure as Code, and it's why Session 5 will feel more familiar than you expect.
+**Git.** Repeatability, history, review through pull requests, and knowledge shared in a repo rather than someone's memory. 
+
+Similar to how I asked you to recreate our resource group `pds-deep-dive`. If I asked you to recreate the code for your first project for me now, you wouldn't start from scratch. 
+
+As an industry, we've had the answer to ClickOps for ages; it just never occurred to anyone to apply it to servers. That's the entire premise of Infrastructure as Code, and it's why terraform will feel more familiar than you expect.
 
 Let's not take the "no audit trail" point on faith.
 
@@ -1223,7 +1230,7 @@ The CLI equivalent, worth showing:
 az monitor activity-log list --resource-group pds-deep-dive --max-events 10 -o table
 ```
 
-**Closing the section:** none of this means the Portal is bad. It's genuinely great for exploring, learning what a service looks like, and one-off investigation — which is exactly what we used it for today. The problem is relying on it as the *primary* way real infrastructure gets built.
+None of this means the Portal is bad. It's genuinely great for exploring, learning what a service looks like, and one-off investigation — which is exactly what we used it for today. The problem is relying on it as the *primary* way real infrastructure gets built.
 
 That gap is what Terraform closes: instead of clicking through a wizard, you write your desired state in text files, and a tool reconciles what exists against what you declared, changing only what's needed.
 
@@ -1277,7 +1284,7 @@ az ad sp list --show-mine -o table
 ```
 
 **ASK** <br>
-We had to type the resource group's name to confirm deletion, and everything inside it disappeared at once. Why the extra friction, and what does that cascading delete tell us? <br>
+We had to type the resource group's name to confirm deletion, and everything inside it disappeared at once. Why the extra friction, and what does that cascading delete, where all resources inside the group go as well tell us? <br>
 **ANSWER** <br>
 Typing the name is deliberate friction, stopping an accidental click destroying everything inside. And the cascading delete is exactly why you group resources by **shared lifecycle** — anything you don't want destroyed together shouldn't share a resource group. It's the same reason `DROP DATABASE` doesn't have a one-click button.
 
@@ -1286,13 +1293,12 @@ Typing the name is deliberate friction, stopping an accidental click destroying 
 Today was deliberately broad: DevOps as a mindset, Azure as the platform. From here the course goes deep, one layer at a time:
 
 - **Session 2 — Linux & automation** — confident command line and scripting, so you're not fighting the terminal while learning everything else
-- **Session 3 — Docker deep dive** — building on what you already know, for the cloud
-- **Session 4 — Jenkins & pipelines** — how code changes get built, tested and deployed automatically
-- **Session 5 — Terraform & IaC** — everything we clicked through today, written declaratively, reviewed through Pull Requests
-- **Session 6 — Resource provisioning & remote state** — real infrastructure: networks, VMs, load balancers
-- **Session 7 — Kubernetes** — running and scaling applications
-- **Session 8 — Integration** — one pipeline: a code change flowing through to running Azure infrastructure
-- **Session 9 — Capstone** — you build it yourself, on your own application
+- **Session 3 — Jenkins & pipelines** — how code changes get built, tested and deployed automatically
+- **Session 4 — Terraform & IaC** — everything we clicked through today, written declaratively, reviewed through Pull Requests
+- **Session 5 — Resource provisioning & remote state** — real infrastructure: networks, VMs, load balancers
+- **Session 6 — Kubernetes** — running and scaling applications
+- **Session 7 — Integration** — one pipeline: a code change flowing through to running Azure infrastructure
+- **Session 8 & 9 — Capstone** — you build it yourself, on your own application
 
 Everything you did today — resource groups, tagging, budgets, regions, VNets and subnets, RBAC and Service Principals — reappears **by name** in every one of those. That's deliberate. Today was building the map.
 
