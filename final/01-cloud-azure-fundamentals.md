@@ -759,6 +759,7 @@ Part A *(10 min)* — create the `pds-deep-dive` resource group by hand, as just
 
 Part B *(15 min)* — your first real resource.
 - From inside `pds-deep-dive`, click **Create** and search **Storage account**
+  - We're in a MarketPlace for all Azure products. The specific **Storage Account** we want is an `Azure Service` created by `Microsoft` and the logo looks like a white calendar on a green background.
 - **Resource group**: `pds-deep-dive`
 - **Storage account name**: something globally unique, e.g. `<yourprefix>pdsdeepdive`
 - **Region**: `UK South`
@@ -769,10 +770,13 @@ Part B *(15 min)* — your first real resource.
   - **Table** is NoSQL, similar in shape to JSON documents
 - **Performance**: Standard · **Redundancy**: leave default
 - **Review + create** → **Create**
+
+It's worth explaining the Market Place we landed on. It's not just a list of Azure services but a catalogue where you can find Microsoft and third/party solutions. Which is why we saw lots of different things.
+
 - Once deployed, explore **Containers**, **Access keys** and **Networking**
 
 Part C *(10 min)* — tagging and budgets.
-- Go to `pds-deep-dive` → **Tags**. Add `environment` = `training` and `owner` = your name → **Apply**
+- Go to `pds-deep-dive` (the Resource Group) → **Tags**. Add `environment` = `training` and `owner` = your name → **Apply**
 - Then `pds-deep-dive` → **Cost Management** → **Budgets** → **Add**
   - Name: `pds-deep-dive-budget`
   - Amount: `5`
@@ -828,6 +832,7 @@ az group list -o table
 az resource list --resource-group pds-deep-dive-cli -o table
 ```
 
+
 Reading the storage account command:
 - `--name` — globally unique, lowercase and numbers only
 - `--resource-group` — which container it goes in
@@ -845,16 +850,18 @@ az group show --name pds-deep-dive --query tags
 **ASK** *(worth doing right after they've done both)* <br>
 You've now created the same thing twice — once by clicking, once by typing. Which took longer, and which would you rather hand to a colleague? <br>
 **ANSWER** <br>
-The Portal was probably quicker the *first* time, because the wizard tells you what it needs. But the CLI command can be **saved in a file, re-run tomorrow, pasted into a message, and put in Git**. The click cannot. That gap is the whole argument of this afternoon, and the reason Session 5 exists.
+The Portal was probably quicker the *first* time, because the wizard tells you what it needs. But the CLI command can be **saved in a file, re-run tomorrow, pasted into a message, and put in Git**. The click cannot. That gap is the whole argument of this afternoon, and the reason Session scripts and terraform exist.
 
 **Common failure:** `The storage account named X is already taken.` The name is globally unique across all of Azure, so `storage`, `test` and `demo` are long gone. Add more of your own name.
 
-**On budget scope** — worth demoing all three levels:
-- Scoped to the **resource group**, as students just did
+**On budget scope** — earlier we created a budget, it's worth noting there's different levels we can create the budget:
+- Scoped to the **resource group**, as we just did
 - Scoped to the **subscription** — *(In the Azure Portal — Subscriptions → yours → Budgets)*
 - Scoped to the whole **billing account** — **Cost Management + Billing → Budgets**
 
-Show the **filters** available when creating one: by resource group, resource, service name, location. You can be as broad or as narrow as you need.
+If I start created a budget on the subscription, you'll be able to see the **filters** available when creating one: by resource group, resource, service name, location. You can be as broad or as narrow as you need.
+
+Let's pivot again.
 
 **ASK** <br>
 Why might a large organisation refuse to let a resource be created at all unless it's tagged with `environment` and a cost centre? <br>
@@ -873,6 +880,7 @@ No — but **monitoring** the spend and investigating unexpected increases is sq
 
 <br>
 <br>
+
 ### 14:00–14:30 — Regions and Availability
 *(Activity: 15 min)*
 
