@@ -575,10 +575,10 @@ Reading a whole JSON blob to find one field is fine by eye, useless in a script.
 az account show --query id -o tsv
 ```
 
-- `--query id` picks a single field out of the JSON. It's **JMESPath** — think of it as a query language for JSON, conceptually like a selector
+- `--query id` picks a single field out of the JSON, in this case the `id`. It's **JMESPath** — think of it as a query language for JSON, conceptually like a selector
 - `-o tsv` prints the bare value with no quotes or braces
 
-Compare the two side by side on screen — `az account show --query id` versus `az account show --query id -o tsv`. The first gives you `"a755c4aa-..."` with quotes; the second gives you the value alone. That difference matters enormously the moment you start feeding output into other commands, which is Session 2.
+You should compare the two side by side on screen — `az account show --query id` versus `az account show --query id -o tsv`. The first gives you `"a755c4aa-..."` with quotes; the second gives you the value alone. That difference matters enormously the moment you start feeding output into other commands, which is Session 2.
 
 For a nested field, use a dot:
 ```bash
@@ -609,8 +609,7 @@ That **anything clickable has a scriptable equivalent**, because the click and t
 
 Azure organises everything you own into a hierarchy. Get comfortable with this now — it'll save a lot of confusion once we start writing Terraform.
 
-*REFER TO RESOURCE 2 - SLIDEE* <br>
-![azure-fundamentals-1](./slidee/images/azure_hierarchy.png)
+- `SLIDE ACROSS`
 
 From the top down:
 
