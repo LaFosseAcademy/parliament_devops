@@ -1,6 +1,8 @@
 # DevOps / Git / Azure
 
 ---
+<img src="./images/calms-devops-pillars.png">
+---
 
 <img src="./images/azure_hierarchy.png">
 

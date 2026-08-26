@@ -234,8 +234,7 @@ Full day, **09:00–17:00**, with a one-hour lunch and three 15-minute breaks.
 
 - Run `npx slidee` from within the `curriculum` folder to see the available slide decks (those with extension `.slides.md`)
 - Click on `See your presentations`
-- Open `Weeks X Y > CDO > Azure Fundamentals`
-- Hit `s` to open the presenter notes
+- Open `Cloud Azure Fundamentals`
 - Resource to be kept open on a tab throughout lecture to refer to
 
 #### For Students
@@ -314,6 +313,8 @@ They write more defensively. They add their own logging and monitoring instead o
 That one incentive shift explains a surprising amount of DevOps culture and tooling.
 
 One common way people summarise the pillars of DevOps is the acronym **CALMS**:
+
+`SLIDE 1`
 
 - **Culture** — breaking down the wall between Dev and Ops. Shared responsibility instead of finger-pointing when something breaks
 - **Automation** — anything a human does repeatedly and manually is a future source of mistakes. If you're doing it by hand every week, it should probably be a script
