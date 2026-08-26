@@ -749,7 +749,7 @@ Let's create something by hand, the way you might if you'd never heard of Terraf
 - **Region**: `UK South`
 - **Review + create** → **Create**
 
-![azure-fundamentals-2](./slidee/images/azure_resource_group_1.png)
+![azure-fundamentals-2](../slidee/images/01-cloud-azure-fundamentals/azure_resource_group_1.png)
 
 That took thirty seconds. Quick, easy — and exactly the kind of thing that becomes a real problem at scale, as we'll see this afternoon.
 
