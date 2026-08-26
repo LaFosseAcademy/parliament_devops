@@ -5,7 +5,8 @@
 ---
 <img src="./images/01-cloud-azure-fundamentals/devops-daily-habits.png">
 ---
-
+<img src="./images/01-cloud-azure-fundamentals/cloud-service-models.png">
+---
 <img src="./images/azure_hierarchy.png">
 
 ---

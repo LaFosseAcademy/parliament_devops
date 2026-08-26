@@ -374,6 +374,8 @@ Why do we think so many companies choose this over running their own hardware? <
 
 There are several models for accessing cloud resources. Everyone here has probably used iCloud, Google Drive or Dropbox — cloud services, but really only storage and networking. The three models you should actually know:
 
+- `SLIDE ACROSS`
+
 - **SaaS** — Software as a Service
 - **PaaS** — Platform as a Service
 - **IaaS** — Infrastructure as a Service
@@ -441,6 +443,7 @@ We're focusing on **Azure** because it's what PDS use, and because it's deeply i
 
 <br>
 <br>
+
 ### 10:30–11:15 — Setting Up Your Azure Account
 *(Activity: 25 min)*
 
