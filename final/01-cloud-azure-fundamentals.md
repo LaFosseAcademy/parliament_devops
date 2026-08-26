@@ -314,7 +314,7 @@ That one incentive shift explains a surprising amount of DevOps culture and tool
 
 One common way people summarise the pillars of DevOps is the acronym **CALMS**:
 
-`SLIDE 1`
+- `SLIDE ACROSS`
 
 - **Culture** — breaking down the wall between Dev and Ops. Shared responsibility instead of finger-pointing when something breaks
 - **Automation** — anything a human does repeatedly and manually is a future source of mistakes. If you're doing it by hand every week, it should probably be a script
@@ -328,6 +328,8 @@ Which of those five do you think is hardest for an established, traditional comp
 Usually Culture. Buying a new tool or installing a pipeline is comparatively easy. Changing how teams are structured, how success is measured, and how blame is (or isn't) handled after an incident is a much slower, harder organisational shift — and it's the one that makes all the others stick.
 
 So practically — what does this look like in an engineer's daily habits? Five things we'll keep returning to:
+
+- `SLIDE ACROSS`
 
 1. **Everything as code, everything in version control.** You already do this for application code. The shift is that **infrastructure, pipeline configuration and even documentation** get the same treatment. If it's not in Git, it effectively doesn't exist to the team — it can't be reviewed, reverted or reliably reproduced.
 2. **Small, frequent changes over big, risky ones.**
