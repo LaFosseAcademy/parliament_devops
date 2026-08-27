@@ -773,7 +773,21 @@ Part B *(15 min)* — your first real resource.
 
 It's worth explaining the Market Place we landed on. It's not just a list of Azure services but a catalogue where you can find Microsoft and third/party solutions. Which is why we saw lots of different things.
 
-- Once deployed, explore **Containers**, **Access keys** and **Networking**
+- Once deployed, click **Go to resource**. Everything below is in this
+  storage account's own left-hand menu.
+  - **Data storage → Containers** — empty. This is where blobs would live.
+    Click **+ Container**, name it `uploads`, and note it defaults to
+    **Private** access. Anonymous public access is off by default,
+    and that's deliberate.
+  - **Security + networking → Access keys** — click **Show** on key1.
+    That connection string is full read/write access to everything in
+    this account. It's the *storage account's* shared key — nothing to
+    do with the RBAC roles we look at this afternoon.
+  - **Security + networking → Networking** — currently reachable from
+    **all networks**. Note the alternatives (selected networks, or
+    private endpoint only). We're leaving it open; production wouldn't.
+
+
 
 Part C *(10 min)* — tagging and budgets.
 - Go to `pds-deep-dive` (the Resource Group) → **Tags**. Add `environment` = `training` and `owner` = your name → **Apply**

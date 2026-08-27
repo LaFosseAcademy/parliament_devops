@@ -296,7 +296,7 @@ Here's the shape of the day. This morning is pure bash: from chaining two comman
 
 **One thing to say up front.** You are all experienced developers. You write JavaScript daily. **Bash will not feel like JavaScript.** It's a genuinely odd language — you close an `if` with `fi`, spaces inside brackets change the meaning, and variables have a `$` when you read them but not when you set them. None of that is you being slow. It's just strange. I'll go slowly through the strange bits.
 
-You already know `cd`, `ls` and `mkdir`, so we're not at zero — but everything past those three is new today.
+You already know `cd`, `ls` and `mkdir`, so we're not at zero — but we'll definitely be seeing a lot of new commands today. 
 
 **Everyone set up a scratch folder now:**
 
@@ -399,6 +399,8 @@ This is the idea that makes the shell feel like a superpower. A **pipe** (`|`) t
 
 Meet the four small commands we'll pipe *into*, because they're new:
 
+- `SLIDE ACROSS`
+
 | Command | Does |
 |---|---|
 | `sort` | Puts lines in alphabetical order. `sort -r` reverses it |
@@ -408,23 +410,23 @@ Meet the four small commands we'll pipe *into*, because they're new:
 
 `grep` is the single most-used command in a DevOps engineer's day, mostly for hunting through logs.
 
-Build the pipeline up one stage at a time on screen, so students watch the list shrink:
+*Build the pipeline up one stage at a time on screen, so students watch the list shrink:*
 
 *(Run from `~/bash-training`)*
 ```bash
-ls /etc
+ls /etc/
 ```
 A long list of the system's configuration files. Now sort it:
 
 *(Run from `~/bash-training`)*
 ```bash
-ls /etc | sort
+ls /etc/ | sort
 ```
 Now keep only the first five:
 
 *(Run from `~/bash-training`)*
 ```bash
-ls /etc | sort | head -5
+ls /etc/ | sort | head -5
 ```
 
 Each command does one small job; the pipe stitches them into a **pipeline**, output flowing left to right. That's the Unix philosophy in a line: lots of small tools that do one thing well, joined together.
@@ -433,9 +435,13 @@ Now `grep` filtering rather than sorting:
 
 *(Run from `~/bash-training`)*
 ```bash
-ls /etc | grep conf
-ls /etc | grep conf | wc -l
+ls /etc/ | grep conf
+# Lists everything in /etc/keeps only lines containing 'conf'
+ls /etc/ | grep conf | wc -l
+# 'wc -l' counts the number of lines
 ```
+
+Imagine we did a deployment and it didn't work, with a similar commands we could use 'grep' to search for errors, how many errors there are. 
 
 **ASK** <br>
 You've all chained array methods — `.filter().map().length`. How is a pipeline different, and how is it the same? <br>
@@ -456,7 +462,7 @@ By default a command prints to your screen. You can send that output into a file
 
 *(Run from `~/bash-training`)*
 ```bash
-ls -la > listing.txt
+ls -la > listing.txt     # List hidden items in long format
 cat listing.txt
 ```
 
@@ -475,17 +481,29 @@ cat log.txt
 
 Get those the wrong way round and you'll destroy a file you meant to add to. This bites everyone once.
 
+*(Run from `~/bash-training`)*
+```bash
+echo "mistake" > log.txt
+cat log.txt
+```
+
+
+
 **Capturing a command's output into text with `$( )`**
 
-**Command substitution** — run a command and drop *its output* into another line. Anything inside `$( )` runs first, and its output replaces the `$( )`.
+Anything inside the dollar symbol and parenthesies `$( )` runs first, and its output replaces the `$( )`.
 
 *(Run from `~/bash-training`)*
 ```bash
-date
 echo "This backup ran at $(date)"
 ```
 
 We'll use this constantly to timestamp things.
+
+*(Run from `~/bash-training`)*
+```bash
+echo "Earlier I made a $(cat log.txt)"
+```
 
 So the toolkit: `;`, `&&`, `||`, `|`, `>`, `>>`, `$( )` — plus `sort`, `head`, `wc -l` and `grep`. Everything we write today is your existing commands glued together with these.
 
@@ -501,28 +519,28 @@ Your turn. Type these — don't paste — and **predict what each will do before
 
 *(Run everything from `~/bash-training`)*
 
-Part A — sequencing and safety.
-1. Run `mkdir demo && cd demo`, confirm with `pwd` → **you are now in `~/bash-training/demo`**
-2. From *inside* `demo`, run `mkdir demo && cd demo` **again**. What happens, and why did `cd` not run? Try the same with `;` and note the difference
-3. Create three empty files in one line: `touch a.txt b.txt c.txt`, confirm with `ls`
+Part A — sequencing and safety.<br>
+1. Run `mkdir demo && cd demo`, confirm with `pwd` → **you are now in `~/bash-training/demo`** <br>
+2. From `~/bash-training`, run `mkdir demo && cd demo` **again**. What happens, and why did `cd` not run? Try the same with `;` and note the difference<br>
+3. Create three empty files in one line: `touch a.txt b.txt c.txt`, confirm with `ls`<br>
 
-Part B — pipes.
-4. `ls -la /etc | wc -l` — count the entries in `/etc`
-5. `ls /etc | sort | head -10`, then `ls /etc | sort -r | head -10`. What did `-r` change?
-6. `history | grep cd` — search your own command history
-7. `cat /etc/passwd | grep "$USER"` — find your own user's line in the system's user file
+Part B — pipes.<br>
+4. `ls -la /etc | wc -l` — count the entries in `/etc`<br>
+5. `ls /etc | sort | head -10`, then `ls /etc | sort -r | head -10`. What did `-r` change?<br>
+6. `history | grep cd` — search your own command history<br>
+7. `cat /etc/passwd | grep "$USER"` — find your own user's line in the system's user file<br>
 
-Part C — redirection and substitution.
-8. `ls -la > my-listing.txt`, then `cat my-listing.txt`
-9. `echo "First line" > notes.txt`, then `echo "Second line" >> notes.txt`, then `cat notes.txt`. Now run the **first** command again — what happened to "Second line", and why?
-10. `echo "Report generated on $(date) by $(whoami)" > report.txt` and read it back
+Part C — redirection and substitution.<br>
+8. `ls -la > my-listing.txt`, then `cat my-listing.txt`<br>
+9. `echo "First line" > notes.txt`, then `echo "Second line" >> notes.txt`, then `cat notes.<br>txt`. Now run the **first** command again — what happened to "Second line", and why?<br>
+10. `echo "Report generated on $(date) by $(whoami)" > report.txt` and read it back<br>
 
-Part D — start your dictionary.
-11. Open `my-command-dictionary.md` from the starter repo and fill in every row you've met so far, **in your own words**. Not copied from the notes — if you can't explain it simply, you haven't got it yet
+Part D — start your dictionary.<br>
+11. Open `my-command-dictionary.md` from the starter repo and fill in every row you've met so far, **in your own words**. Not copied from the notes — if you can't explain it simply, you haven't got it yet<br>
 
-Part E (stretch).
-12. In one line, count how many files in `/usr/bin` have names containing "python"
-13. Build a pipeline that lists your files, sorts them by size, and shows only the largest few. (Hint: `ls -lS`)
+Part E (stretch).<br>
+12. In one line, count how many files in `/usr/bin` have names containing "python"<br>
+13. Build a pipeline that lists your files, sorts them by size, and shows only the largest few. (Hint: `ls -lS`)<br>
 **END OF NOTE**
 
 **💬 SLACK — snippet 1**, post at the start:
