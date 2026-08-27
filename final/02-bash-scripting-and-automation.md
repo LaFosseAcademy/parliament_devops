@@ -630,6 +630,7 @@ In step 9, running the first `echo` again wiped "Second line". If that had been 
 
 <br>
 <br>
+
 ### 10:30–11:00 — Your First Script: Shebang, Permissions, Running It
 *(Activity: 10 min)*
 
