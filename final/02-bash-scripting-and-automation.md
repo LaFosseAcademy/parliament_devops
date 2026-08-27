@@ -517,6 +517,8 @@ Your turn. Type these — don't paste — and **predict what each will do before
 
 **HANDS ON (30 min)** <br>
 
+- `SLIDE ACROSS`
+
 *(Run everything from `~/bash-training`)*
 
 Part A — sequencing and safety.<br>
@@ -536,7 +538,7 @@ Part C — redirection and substitution.<br>
 10. `echo "Report generated on $(date) by $(whoami)" > report.txt` and read it back<br>
 
 Part D — start your dictionary.<br>
-11. Open `my-command-dictionary.md` from the starter repo and fill in every row you've met so far, **in your own words**. Not copied from the notes — if you can't explain it simply, you haven't got it yet<br>
+11. Open `02-my-command-dictionary.md` from the student facing repo and fill in every row you've met so far, **in your own words**. Not copied from the notes — if you can't explain it simply, you haven't got it yet<br>
 
 Part E (stretch).<br>
 12. In one line, count how many files in `/usr/bin` have names containing "python"<br>
