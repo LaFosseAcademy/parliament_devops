@@ -632,6 +632,10 @@ In step 9, running the first `echo` again wiped "Second line". If that had been 
 <br>
 
 ### 10:30–11:00 — Your First Script: Shebang, Permissions, Running It
+
+*(Run from `/~`)* 
+I'm going to clear the files we've created so far: `rm -rf bash-training/*`
+
 *(Activity: 10 min)*
 
 Everything so far, we've typed one line at a time. Fine for two or three commands. But real setup work is dozens of steps, run repeatedly, that need to behave *identically* every time. Typing them by hand invites typos, skipped steps, and "well, it worked on my machine".
@@ -639,7 +643,7 @@ Everything so far, we've typed one line at a time. Fine for two or three command
 A **script** is the fix. Just a plain text file containing the commands you'd otherwise type, run top to bottom. Because it's a file, you can save it, put it in Git, review it in a pull request, share it, and re-run it identically a thousand times.
 
 **ASK** <br>
-That list — saved, versioned, reviewed, re-run — should sound familiar. What have you been doing that with for years? <br>
+That list — saved, versioned, reviewed, re-run — should sound familiar. What have you been doing that with since we started the course? <br>
 **ANSWER** <br>
 Application code. And that's the whole point: the moment a manual process becomes a script, **every good habit you already have for code applies to it**. Code review, version history, blame, rollback. This is "everything as code" from Session 1, arriving for the first time in something you can actually run.
 
@@ -710,6 +714,9 @@ We'll meet the numeric form (`chmod 400`, `chmod 755`) in a later session when w
 That "specific list of folders" is what we're doing next, and it's worth understanding properly.
 
 **HANDS ON (10 min)** <br>
+
+- `SLIDE ACROSS`
+
 *(Run from `~/bash-training`)*
 1. Create `hello.sh` as above, make it executable, and run it
 2. Run `ls -l hello.sh` before and after the `chmod` and note exactly what changed
@@ -784,14 +791,14 @@ Compare with your own script:
 file hello.sh
 ```
 
-That says *"Bourne-Again shell script, ASCII text executable"* — plain text, and the shebang tells the system what to run it with.
+That says *"Bourne-Again shell script, UNICODE"* — plain text, and the shebang tells the system what to run it with.
 
 **ASK** <br>
 So both `ls` and `hello.sh` are executable files. What's the actual difference between them? <br>
 **ANSWER** <br>
 `ls` is **compiled machine code** — the CPU runs it directly. `hello.sh` is **plain text** that needs an interpreter, which the shebang names. Practically it means a binary is faster and self-contained, while a script is readable, editable and portable. And crucially, **the shell treats both identically** — a command is a command. That's why once we put our script in the right place, it becomes as much a "real command" as `ls` is.
 
-That parallel is worth naming: `node app.js` versus a compiled Go binary is the same distinction, one layer up.
+We spoke before about interpreted languages and compiled languages. 
 
 #### Where programs live
 
@@ -803,6 +810,8 @@ ls /
 ```
 
 The Linux filesystem is standardised — the **Filesystem Hierarchy Standard** — so these folders mean the same thing on almost any Linux machine you ever log into. The ones that matter:
+
+- `SLIDE ACROSS`
 
 | Folder | Purpose |
 |---|---|
@@ -842,7 +851,7 @@ Prove the "in order" part:
 *(Run from `~/bash-training`)*
 ```bash
 which -a python3      # ALL the matches, in PATH order
-type ls               # what IS this — binary, alias, or function?
+type python3               # what IS this — binary, alias, or function?
 ```
 
 To make *our* script callable by name, we put it in a folder on that list — or add a new folder to it.
@@ -888,7 +897,9 @@ A script doing the same thing every time is useful. A script you can *tell what 
 
 *(Run from `~/bash-training`)*
 - Run: `touch greet`
-- Then: `code greet`
+- Then: `nano greet`
+
+- `SLIDE ACROSS`
 
 ```bash
 #!/bin/bash
@@ -914,9 +925,13 @@ chmod +x greet
 ./greet Alice Bob
 ```
 
-`$1` is `Alice`, `$2` is `Bob`, `$#` is `2`. This is exactly the mechanism behind `scaffold countries` after the break.
+`$1` is `Alice`, `$2` is `Bob`, `$#` is `2`.
 
-**Asking interactively with `read`**
+**We can interactively define variables with `read`**
+
+*(Run from `~/bash-training`)*
+- Run: `touch create`
+- Then: `nano create`
 
 ```bash
 #!/bin/bash
@@ -924,23 +939,29 @@ read -p "What should we call the resource? " resource
 echo "Great — we'll scaffold '$resource'"
 ```
 
+*(Run from `~/bash-training`)*
+```bash
+chmod +x create
+./greet 
+```
+
 `read -p` prints the prompt, waits for input, stores it in `resource`. Use it afterwards as `$resource`.
 
 **HANDS ON (20 min)** <br>
 
-Part A *(10 min)* — the filesystem, hands on.
-1. *(Run from `~/bash-training`)* Run `ls /` and open two folders you've never looked in. What's in `/var/log`?
-2. Run `which ls`, `which git`, `which docker`. Which folders did each come from? Compare with the person next to you — are they the same?
-3. Run `file $(which ls)` and `file hello.sh`. Explain the difference to your neighbour
-4. Run `echo $PATH` and count how many folders are on it
+Part A *(10 min)* — the filesystem, hands on. <br>
+1. *(Run from `~/bash-training`)* Run `ls /` and open two folders you've never looked in. What's in `/var/log`? <br>
+2. Run `which ls`, `which git`, `which docker`. Which folders did each come from? Compare with the person next to you — are they the same? <br>
+3. Run `file $(which ls)` and `file hello.sh`. Explain the difference to your neighbour <br>
+4. Run `echo $PATH` and count how many folders are on it <br>
 
-Part B *(10 min)* — naming your script.
-5. Create `~/bin`, move `hello.sh` in as `hello`, and add `~/bin` to your PATH
-6. Prove it runs from `~/` and from `/tmp`
-7. Create the `greet` script, install it to `~/bin/greet`, and run `greet DevOps Engineer` from a different folder
-8. Modify `greet` to print `Hello <first-arg>, nice to meet you`
-9. Write a tiny `ask` script using `read` that asks for a name and echoes it back
-10. Add today's new commands — `which`, `type`, `file`, `chmod` — to your dictionary
+Part B *(10 min)* — naming your script. <br>
+5. Create `~/bin`, move `hello.sh` in as `hello`, and add `~/bin` to your PATH <br>
+6. Prove it runs from `~/` and from `/tmp` <br>
+7. Create the `greet` script, install it to `~/bin/greet`, and run `greet DevOps Engineer` from a different folder <br>
+8. Modify `greet` to print `Hello <first-arg>, nice to meet you` <br>
+9. Write a tiny `ask` script using `read` that asks for a name and echoes it back <br>
+10. Add today's new commands — `which`, `type`, `file`, `chmod` — to your dictionary <br>
 **END OF NOTE**
 
 **💬 SLACK — snippet 3**:
@@ -1024,6 +1045,7 @@ cd /tmp && hello
 
 <br>
 <br>
+
 ### 11:40–12:00 — Logic: Conditionals, Loops and Functions
 *(Activity: 10 min + challenge)*
 
