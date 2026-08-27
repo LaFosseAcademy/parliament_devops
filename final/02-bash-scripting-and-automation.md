@@ -292,7 +292,7 @@ And you've done **Docker** — building images, running containers, pushing to a
 
 Today is the glue. It's about the **shell** and **scripting** — the single most-used skill a DevOps engineer has, and the thing that turns "I did a task once, by hand" into "this task now runs the same way every time, for everyone, forever."
 
-Here's the shape of the day. This morning is pure bash: from chaining two commands together, up to a named script that scaffolds an entire Express application in one command. After lunch we talk about what automation actually *means*, look at PowerShell in the Azure Cloud Shell, and then spend the back half on a capstone pulling bash, Docker and Azure together.
+Here's the shape of the day. This morning is pure bash: from chaining two commands together, up to a named script that scaffolds an entire Express application in one command. After lunch we talk about what automation actually *means*, look at PowerShell in the Azure Cloud Shell, and then spend the back half on a capstone (our practical conclusion) pulling bash, Docker and Azure together.
 
 **One thing to say up front.** You are all experienced developers. You write JavaScript daily. **Bash will not feel like JavaScript.** It's a genuinely odd language — you close an `if` with `fi`, spaces inside brackets change the meaning, and variables have a `$` when you read them but not when you set them. None of that is you being slow. It's just strange. I'll go slowly through the strange bits.
 
