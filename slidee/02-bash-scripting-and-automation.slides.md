@@ -14,3 +14,12 @@
 
 ---
 <img src="./images/02-bash-scripting-and-automation/bash-script-arguments.png">
+
+---
+<img src="./images/02-bash-scripting-and-automation/bash-exercise-filesystem-path.png">
+
+---
+<img src="./images/02-bash-scripting-and-automation/bash-test-operators.png">
+
+---
+<img src="./images/02-bash-scripting-and-automation/bash-for-loops.png">
