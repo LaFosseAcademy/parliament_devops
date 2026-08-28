@@ -1771,6 +1771,8 @@ Once you're happy think about how you could extend this script. I'd copy it and 
   - What values would you add to each file by default?
 - Could you run `npm install` as you create the file?
 - How about initialising the directory as a Git Repo?
+- What if a folder called `server` already exists
+- What if no arguments are passed? 
 
 **ASK** *(to close the morning)* <br>
 We've hard-coded nothing about "countries" — it's all driven by arguments. Why does that make it dramatically more valuable to a team than a script that just creates a fixed countries app? <br>
@@ -1797,7 +1799,7 @@ Once the steps live in a script, they can be:
 
 - **Reviewed** — a teammate reads it in a pull request before it ever runs
 - **Version-controlled** — you can see how the process changed over time, and roll it back
-- **Triggered automatically** — on a schedule via **`cron`** (a scheduler built into every Linux system: "every night at 2am", "every 5 minutes", entirely unattended), or by an event like "someone pushed to `main`" (that's Jenkins, in a couple of sessions)
+- **Triggered automatically** — on a schedule via **`cron`** (a scheduler built into every Linux system: "every night at 2am", "every 5 minutes", entirely unattended), or by an event like "someone pushed to `main`" (that's Jenkins or other Pipelines)
 - **Run anywhere** — your laptop, a colleague's, a build server, a cloud shell — behaving the same
 
 **ASK** <br>
@@ -1808,14 +1810,15 @@ Consistency and safety at scale. Humans doing repetitive steps by hand **drift**
 **ASK** <br>
 You already have automated tests. How is a deploy script different from a test suite, and how is it the same? <br>
 **ANSWER** <br>
-**Same:** both encode knowledge that would otherwise live in someone's head, both run identically every time, and both fail loudly rather than silently. **Different:** a test suite *observes* — it changes nothing. A deploy script *acts*, and its mistakes are real and sometimes irreversible. Which is why everything we do from here obsesses over failing safely: checking before acting, failing fast, and making it obvious when something went wrong.
+**Same:** both encode knowledge that would otherwise live in someone's head, both run identically every time, and both fail loudly rather than silently. **Different:** a test suite *observes* — it changes nothing. A deploy script *acts*, and its mistakes are real and sometimes irreversible. Which is why everything we do from here will focus on failing safely: checking before acting, failing fast, and making it obvious when something went wrong.
 
-Now — bash is the **lingua franca** of Linux. That phrase just means "the common language everyone shares": whatever else a team uses, they can all fall back on bash. And it's most of what a DevOps engineer scripts.
+Now — bash is the common language of Linux. whatever else a team uses, they can all fall back on bash. And it's most of what a DevOps engineer scripts.
 
-But it's not the only shell you'll meet, especially in a Microsoft-heavy environment like Azure. So next we step into **PowerShell**, inside the Azure Cloud Shell, and see how it's similar and how it's fundamentally different.
+But it's not the only shell you'll meet, especially in a Microsoft-heavy environment like Azure. So we'll continue with **PowerShell**, inside the Azure Cloud Shell, and see how it's similar and how it's fundamentally different.
 
 <br>
 <br>
+
 ### 14:15–15:00 — PowerShell on the Azure Cloud Shell
 *(Activity: 25 min)*
 
