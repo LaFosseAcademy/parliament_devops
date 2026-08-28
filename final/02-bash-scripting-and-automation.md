@@ -1822,7 +1822,7 @@ But it's not the only shell you'll meet, especially in a Microsoft-heavy environ
 ### 14:15–15:00 — PowerShell on the Azure Cloud Shell
 *(Activity: 25 min)*
 
-You've driven Azure two ways so far: clicking in the Portal, and typing `az` commands in bash. There's a third, and in a lot of Microsoft shops it's the primary one: **PowerShell**.
+You've driven Azure two ways so far: clicking in the Portal, and typing `az` commands in bash. There's a third, and in a lot of Microsoft setups it's the primary one: **PowerShell**.
 
 **Getting to it — the Cloud Shell**
 
@@ -1832,14 +1832,14 @@ Nothing to install. Azure has a browser-based terminal built into the Portal.
 - Sign in to `portal.azure.com`
 - Click the **`>_`** icon (Cloud Shell)
 - If prompted, choose **PowerShell** (not Bash) — there's a dropdown top-left to switch
-- First time, it asks to create a small storage account to persist your files. Normal — let it
+- On the first time, it may ask to create a small storage account to persist your files. Normal — let it
 
 You now have a full PowerShell session, **already authenticated as you**, with the Azure `Az` module preinstalled. No login step, no CLI install — that's the appeal.
 
-**ASK** <br>
-This morning we spent time on `PATH` and where binaries live. The Cloud Shell already has `az`, `kubectl`, `terraform`, `git` and dozens more available. What does that tell you about it? <br>
-**ANSWER** <br>
-It's a **container** Microsoft prepared and runs for you, with all those tools already installed and on the `PATH`. That's why it starts instantly and needs no setup — and it's exactly the same reasoning behind the Docker images you already build. Someone did the install work once, into an image, so nobody has to do it again. That storage account it asks for exists because a container's own filesystem is disposable, so your files need somewhere persistent to live.
+
+This morning we spent time on `PATH` and where binaries live. The Cloud Shell already has `az`, `kubectl`, `terraform`, `git` and dozens more available. <br>
+
+It's a **container** Microsoft prepared and runs for you, with all those tools already installed and on the `PATH`. That's why it starts instantly and needs no setup — and it's exactly the same reasoning behind the Docker images we build. Someone did the install work once, into an image, so nobody has to do it again. That storage account it asks for exists because a container's own filesystem is disposable, so your files need somewhere persistent to live.
 
 **The big conceptual difference: objects, not text**
 
@@ -1849,14 +1849,18 @@ In bash, everything flowing through a pipe is **text**. `ls | grep countries` pa
 
 In PowerShell, everything flowing through a pipe is a proper **object** — a structured thing with named properties. When you list files, each item isn't a line of text; it's a file object with `.Name`, `.Length`, `.LastWriteTime`. You filter and sort on those **properties** directly.
 
-**ASK** <br>
-This morning I asked how a bash pipeline compares to `.filter().map()`. Given what I've just said — which is PowerShell closer to? <br>
-**ANSWER** <br>
-**PowerShell is much closer to your JavaScript array methods.** `Where-Object { $_.Name -like "*.json" }` is essentially `.filter(f => f.name.endsWith('.json'))` — you're reading a property off a structured object, not pattern-matching a string. Which means PowerShell will feel *more* natural to you than bash did, and the mental adjustment is smaller than you'd expect. The trade-off is that bash's text-everything model works with any tool ever written, whereas PowerShell's objects only work with tools that produce PowerShell objects.
+
+This morning I asked how a bash pipeline compares to `.filter().map()`.<br>
+
+- `SLIDE ACROSS`
+
+**PowerShell is much closer to your JavaScript array methods.** We can write PowerShell syntax which is essentially `.filter(f => f.name.endsWith('.json'))` — you're reading a property off a structured object, not pattern-matching a string. Which means PowerShell will feel *more* natural to you than bash did, and the mental adjustment is smaller than you'd expect. The trade-off is that bash's text-everything model works with any tool ever written, whereas PowerShell's objects only work with tools that produce PowerShell objects.
 
 **Cmdlets — the Verb-Noun pattern**
 
 PowerShell commands are **cmdlets** ("command-lets"), and they follow a rigid naming pattern: **`Verb-Noun`**.
+
+- `SLIDE ACROSS`
 
 | Cmdlet | What it does | Bash equivalent |
 |---|---|---|
@@ -1905,7 +1909,9 @@ Write-Output "Scaffolding $name"
 
 **Talking to Azure — the `Az` module**
 
-This is why PowerShell matters for you specifically. Compare against the `az` CLI commands from Session 1:
+This is why PowerShell matters to us specifically. Compare against the `az` CLI commands from Session 1:
+
+- `SLIDE ACROSS`
 
 | Task | Azure CLI (bash) | PowerShell (`Az` module) |
 |---|---|---|
@@ -1928,24 +1934,28 @@ No — because **you don't get to choose the environment you walk into**. Plenty
 Part A — get your bearings.
 1. Run `Get-ChildItem`, then its alias `ls`. Confirm they're identical
 2. Run `Get-Command -Verb Get | Select-Object -First 20` — see how many "Get" cmdlets exist
+  - So we pull all the commands available to us `Get-Command`
+  - Filter by those with the verb `Get`
+  - Then we filter with `Select-Object` and only return the first 20
 3. Run `Get-Help Get-AzResourceGroup` — the built-in docs for any cmdlet
 
-Part B — objects, not text.
-4. `Get-ChildItem | Sort-Object Length -Descending | Select-Object Name, Length -First 5`. Notice you selected **properties by name**
+Part B — objects, not text. <br>
+4. `Get-ChildItem | Sort-Object Length -Descending | Select-Object Name, Length -First 5`. Notice you selected **properties by name** 
+  - So asking the shell to show us all local files, sorted by length 
+  - Of those objects only reveal the name, length of the first 5
 5. `Get-Process | Where-Object { $_.CPU -gt 1 } | Select-Object Name, CPU` — filtering live processes on a **numeric** property
+  - Get processes where CPU is greater than 1
+  - Only return the name and the amount of sounds of CPU time since it started
 
 Part C — Azure with the Az module.
 6. `Get-AzContext` — which subscription are you in?
 7. `Get-AzResourceGroup` — list them as objects
 8. `New-AzResourceGroup -Name ps-demo-rg -Location uksouth`
-9. Confirm it exists, then filter for it with `Where-Object`
-10. Clean it up with `Remove-AzResourceGroup`
+9. Confirm it exists, then filter for it with `Get-AzResourceGroup | Where-Object { $_.ResourceGroupName -eq "ps-demo-rg" } | Select-Object ResourceGroupName, Location`
+10. Clean it up with `Remove-AzResourceGroup -Name ps-demo-rg`
 
-Part D — comparison.
-11. In your **dictionary**, add a short table: for five bash commands you learned this morning, write the PowerShell equivalent. Do it from memory first, then check
-
-Part E (stretch).
-12. Store a resource group in a variable and pipe it to `Get-Member` — this lists **every property and method** the object has. It's how you *discover* what you can do with something in PowerShell
+Part D — dictionary.
+11. In the student facing repo, update your notes with some syntax from Power Shell.
 **END OF NOTE**
 
 **💬 SLACK — snippet 6**:
