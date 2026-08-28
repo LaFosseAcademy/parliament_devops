@@ -343,7 +343,7 @@ Here's the shape. This morning is mostly the *idea* — what CI/CD is and why an
 
 One thing worth saying up front: **you already do most of this manually.** You write tests. You run them. You build images. You review each other's code before it merges. Today isn't teaching you new *activities* — it's teaching you to make the activities you already do happen **automatically, in a fixed order, with a gate that stops broken things moving forward.**
 
-Jenkins runs on *your* machine today, so there's setup, and setup on real laptops is where the gremlins live. Shout early.
+Jenkins runs on *your* machine today, so there's setup, and setup on real laptops is where we have issues.
 
 **Everyone make a working folder now:**
 
@@ -360,7 +360,7 @@ docker run hello-world   # must succeed
 df -h .                  # check you have a few GB free
 ```
 
-Anything failing there gets fixed **now**, not at 10:15.
+Anything failing there gets fixed **now**.
 
 <br>
 <br>
@@ -369,25 +369,31 @@ Anything failing there gets fixed **now**, not at 10:15.
 
 Before we touch Jenkins, proper time on the *why* — because if the why lands, everything else is detail.
 
-**Let's start with the pain.** Imagine a team with no pipeline. A developer finishes a feature. What has to happen before real users can use it? Pull the latest code, merge, run the tests, build the app, package it, copy it to a server, restart something, check it didn't break. Every step by hand, by a human, usually the same one or two humans who "know how the deploy works".
+**Let's start with the pain.** Imagine a team with no pipeline. You finish a feature. What has to happen before real users can use it? Pull the latest code, merge, run the tests, build the app, package it, copy it to a server, restart something, check it didn't break. Every step by hand, by a human, usually the same one or two humans who "know how the deploy works".
 
 **ASK** <br>
 What goes wrong, over time, with a team that releases entirely by hand? <br>
 **ANSWER** <br>
-Someone forgets a step. Someone does them in a different order. It "works on my machine" but not on the server. The one person who knows the deploy goes on holiday and nobody dares release. And because releasing is scary and manual, they do it **rarely** — which means each release is huge, which makes it *more* likely to break, which makes them even more scared to release. It's a doom loop, and the way out is counter-intuitive: **release more often, not less.**
+Someone forgets a step. Someone does them in a different order. It "works on my machine" but not on the server. The one person who knows the deploy goes on holiday and nobody dares release. And because releasing is scary and manual, they do it **rarely** — which means each release is huge, which makes it *more* likely to break, which makes them even more scared to release. It's a doom loop, and the way out is to **release more often, not less.**
 
 **ASK** <br>
 You already write tests. Who runs them, and when? <br>
 **ANSWER** <br>
-Usually the author, on their own machine, when they remember. Which means: tests get skipped when someone's in a hurry, they run on one person's machine with one person's node version and one person's leftover state, and **nobody finds out something broke until the next person to run them happens to run them**. CI is not a new activity — it's your existing test suite, run **by something that never forgets, on a clean machine, within minutes of every change.**
+Usually the author, on their own machine, when they remember. Which means: tests get skipped when someone's in a hurry, they run on one person's machine with one person's node version and one person's leftover state, and **nobody finds out something broke until the next person to run them happens to run them**. CI (Continuous Integration) isn't new — it's your existing test suite, run **by something that never forgets, on a clean machine, within minutes of every change.**
 
-That reframe usually lands hard with this room. Hold onto it.
+Let's define the terms properly, because people throw them around loosely.
 
-Now let's define the terms properly, because people throw them around loosely.
+- `SLIDE ACROSS`
 
 **Continuous Integration (CI)** — every time someone pushes code, it's automatically **built and tested**, straight away. Not next week, not before a release. The goal is catching a problem *the moment it's introduced*, while it's small and while the person who caused it still remembers what they changed.
 
-**Continuous Delivery (CD)** — every change that passes CI is automatically **packaged and made ready to release**, so shipping is a single, boring, low-risk button press whenever a human decides.
+When we say **built**, that could be compiling the code or bundling the code. Essentually, building is getting code ready to run, testing, packaging or deployment. 
+
+- `SLIDE ACROSS`
+
+**Continuous Delivery (CD)** — every change that passes CI is automatically **packaged and made ready to release**, so shipping is a single, boring, low-risk button press whenever a human decides. Building and pushing a Docker Image could be part of this stage.
+
+- `SLIDE ACROSS`
 
 **Continuous Deployment (also CD)** — the stricter version: every change that passes all checks goes **all the way to production automatically**, no human in the loop.
 
@@ -398,7 +404,6 @@ Delivery keeps a human deciding **when** to release — the release itself is au
 
 **So what is a "pipeline", concretely?** The **automated assembly line** those ideas run on. An ordered series of **stages** — checkout, build, test, package, deploy — where each must pass before the next runs. If any stage fails, the line stops and nothing broken moves further down.
 
-*REFER TO RESOURCE 1 - SLIDEE* <br>
 
 Let me make it concrete with something you've already built. In Session 2 you wrote `containerise`: it ran `docker build`, checked the exit code, and `exit 1`'d if the build failed so the push never happened. **That was a pipeline in miniature, run by hand.** A build stage, a push stage, and a gate between them. All Jenkins does is run that assembly line *for you*, *automatically*, *every time the code changes*, and draw you a picture of which stage passed.
 
@@ -409,28 +414,32 @@ It closes the gap between "I finished writing code" and "my code is running some
 
 **Where does Jenkins fit?** Jenkins is an **automation server**. Its entire job: *watch for an event, and when it happens, run some tasks.* The event is usually "someone pushed to Git". The tasks are whatever you tell it. Jenkins genuinely does not care what they are — it's a very good, very configurable "run these steps when this happens" engine that reads exit codes.
 
-**ASK** <br>
+
 Given Jenkins just runs shell commands and reads exit codes — why did we spend so long on exit codes last session? <br>
-**ANSWER** <br>
+
 Because exit codes are the **entire contract** between your scripts and Jenkins. A stage passes if the last command exits `0` and fails otherwise. That's it. A script that swallows an error and exits `0` anyway makes a broken pipeline look green and ships broken software. Everything Jenkins does about safety rests on your commands being **honest about failure**.
 
 **ASK** <br>
 Jenkins is far from the only tool that does this. What others have you heard of? <br>
 **ANSWER** <br>
-GitHub Actions, GitLab CI, CircleCI, Azure Pipelines, Travis. Jenkins is one of the oldest and most widely deployed. We learn it because it's **self-hosted** — you install and run every piece yourself, so nothing is a hidden black box. Once you understand Jenkins, the managed ones feel easy. (Several of you have probably used GitHub Actions without ever thinking about what's underneath. Today is what's underneath.)
+GitHub Actions, GitLab CI, CircleCI, Azure Pipelines, Travis. Jenkins is one of the oldest and most widely deployed. We learn it because it's **self-hosted** — you install and run every piece yourself, so nothing is a hidden black box. Once you understand Jenkins, the managed ones feel easy. 
 
 One last mental model before we install. Jenkins has two conceptual parts — worth knowing the words even though we run everything on one machine today:
+
+- `SLIDE ACROSS`
 
 - The **controller** runs the web interface, stores configuration, and decides what work needs doing
 - **Agents** are separate machines or containers the controller hands actual work to
 - An **executor** is a single "slot" for running one build. A node with two executors runs two builds at once
 
-**ASK** <br>
-Why might a real team not want the controller running every build directly? <br>
-**ANSWER** <br>
+All can run on our own machines or external machines in the cloud. In our use case we'll have containers doing the work. 
+
+
+Real teams might not want the controller running every build directly? <br>
+
 One badly-behaved build — an infinite loop, something filling the disk — could take down the Jenkins server every team depends on. Agents isolate that risk and let you scale horizontally: busy, add more agents. For a classroom we let Jenkins use itself as the builder, which is fine for learning and not how you'd run it for real.
 
-**Start your glossary now.** Open `pipeline-glossary.md` and fill in the first eight rows before the break — CI, Delivery, Deployment, pipeline, stage, step, agent, executor. **Your own words.**
+**Start your glossary now.** Open `03-pipeline-glossary.md` and fill in the first eight rows before the break — CI, Delivery, Deployment, pipeline, stage, step, agent, executor. **Your own words.**
 
 <br>
 <br>
@@ -439,6 +448,7 @@ One badly-behaved build — an infinite loop, something filling the disk — cou
 
 <br>
 <br>
+
 ### 10:15–11:15 — Installing & Touring Jenkins on Your Laptop
 *(Activity: 35 min)*
 
