@@ -2317,65 +2317,92 @@ containerise countries-api v1
 docker images
 ```
 
-**Then — the push (Azure tie-in).** Extend it so that if a registry name is supplied as a **third** argument, it also pushes to **Azure Container Registry**.
+**Then — the push (Azure tie-in).** Extend it so that if a registry name is supplied as a **third** argument, it also pushes to **Docker Hub**.
 
 **Solution**
 
 ```bash
 #!/bin/bash
-# containerise — build a Docker image from the current app, optionally push to ACR
-# Usage: containerise <image-name> [tag] [acr-registry-name]
+# containerise — build the Dockerfile in the current folder and push it to Docker Hub
+#
+# Usage:  containerise <dockerhub-username> <image-name> [tag]
+#   e.g.  containerise jbloggs countries-api v1
+#         containerise jbloggs countries-api        (tag defaults to 'latest')
 
 set -e
 
-image="$1"
-tag="${2:-latest}"     # default the tag to 'latest' if none given
-registry="$3"          # optional third argument
+username="$1"
+image="$2"
+tag="${3:-latest}"
+
+# Build for the architecture cloud VMs use.
+# On an Apple Silicon Mac this matters — an arm64 image will not run on
+# a standard Azure VM. Change this line only if you know you need to.
+platform="linux/amd64"
+
+usage="Usage: containerise <dockerhub-username> <image-name> [tag]"
 
 log() { echo "[$(date +%H:%M:%S)] containerise: $1"; }
 
-# 2. Validate input
-if [ -z "$image" ]; then
-  echo "Usage: containerise <image-name> [tag] [acr-registry-name]" >&2
+# --- Validate input -----------------------------------------------------
+
+if [ -z "$username" ]; then
+  echo "$usage" >&2
   exit 1
 fi
 
-# 3. Pre-flight checks
+if [ -z "$image" ]; then
+  echo "$usage" >&2
+  exit 1
+fi
+
+# --- Pre-flight checks --------------------------------------------------
+# Cheapest checks first, so we fail in a second rather than after a slow build.
+
 if [ ! -f "Dockerfile" ]; then
   echo "No Dockerfile found in $(pwd) — are you in the app folder?" >&2
   exit 1
 fi
 
 if ! command -v docker > /dev/null; then
-  echo "docker is not installed or not on your PATH." >&2
+  echo "docker is not installed, or not on your PATH." >&2
   exit 1
 fi
 
-# 4 + 5. Build, and fail loudly if the build fails
-log "Building ${image}:${tag}"
-if ! docker build -t "${image}:${tag}" . ; then
-  echo "Docker build FAILED for ${image}:${tag}" >&2
+if ! docker info > /dev/null 2> /dev/null; then
+  echo "docker is installed but not running — start Docker Desktop." >&2
   exit 1
 fi
 
-# 6. Success
-log "Built ${image}:${tag} successfully"
+# --- Build --------------------------------------------------------------
+# Build straight to the full Docker Hub name, so there is nothing to re-tag.
 
-# Optional: push to Azure Container Registry
-if [ -n "$registry" ]; then
-  full="${registry}.azurecr.io/${image}:${tag}"
+full="${username}/${image}:${tag}"
 
-  log "Tagging for ACR as $full"
-  docker tag "${image}:${tag}" "$full"
+log "Building $full for $platform"
 
-  log "Logging in to ACR '$registry'"
-  az acr login --name "$registry" || { echo "ACR login failed" >&2; exit 1; }
-
-  log "Pushing $full"
-  docker push "$full" || { echo "Push failed" >&2; exit 1; }
-
-  log "Pushed $full successfully"
+if ! docker build --platform "$platform" -t "$full" .; then
+  echo "Docker build FAILED for $full" >&2
+  exit 1
 fi
+
+log "Built $full successfully"
+
+# --- Push ---------------------------------------------------------------
+
+log "Pushing $full"
+
+if ! docker push "$full"; then
+  echo "Push FAILED — run 'docker login' and try again." >&2
+  exit 1
+fi
+
+log "Pushed $full successfully"
+
+echo ""
+echo "Anyone can now run it with:"
+echo "  docker run -p 3000:3000 $full"
+
 ```
 
 Four bits of new syntax worth explaining to the room:

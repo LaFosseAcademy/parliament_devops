@@ -389,11 +389,7 @@ Let's define the terms properly, because people throw them around loosely.
 
 When we say **built**, that could be compiling the code or bundling the code. Essentually, building is getting code ready to run, testing, packaging or deployment. 
 
-- `SLIDE ACROSS`
-
 **Continuous Delivery (CD)** — every change that passes CI is automatically **packaged and made ready to release**, so shipping is a single, boring, low-risk button press whenever a human decides. Building and pushing a Docker Image could be part of this stage.
-
-- `SLIDE ACROSS`
 
 **Continuous Deployment (also CD)** — the stricter version: every change that passes all checks goes **all the way to production automatically**, no human in the loop.
 

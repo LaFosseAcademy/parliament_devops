@@ -39,3 +39,21 @@
 ---
 
 <img src="./images/02-bash-scripting-and-automation/bash-exercise-logic.png">
+
+---
+
+<img src="./images/02-bash-scripting-and-automation/bash-challenge-countdown.png">
+
+---
+
+<img src="./images/02-bash-scripting-and-automation/bash-scaffold-tree.png">
+
+---
+
+<img src="./images/02-bash-scripting-and-automation/powershell-text-vs-objects.png">
+
+---
+
+<img src="./images/02-bash-scripting-and-automation/azure-cli-vs-powershell.png">
+
+
