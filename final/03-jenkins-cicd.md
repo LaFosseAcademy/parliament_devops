@@ -450,7 +450,7 @@ One badly-behaved build — an infinite loop, something filling the disk — cou
 
 Let's get a real Jenkins running on your own machine. We run Jenkins itself as a **Docker container**, for three reasons: you already know Docker, it behaves *identically* on Windows and Mac (no OS-specific installer mess), and it keeps your laptop clean — if it all goes wrong, delete a container and start again.
 
-There's one wrinkle we solve up front. Later today the pipeline needs to run `docker build` *from inside* Jenkins, and the standard Jenkins image doesn't include the Docker command-line tool. So we build a small custom image that adds it, and give Jenkins access to your laptop's Docker. Doing this now means the afternoon "just works".
+There's one wrinkle we solve up front. Later today the pipeline needs to run `docker build` and Docker commands *from inside* Jenkins, and the standard Jenkins image doesn't include the Docker command-line tool. So we build a small custom image that adds it, and give Jenkins access to your laptop's Docker. Doing this now means the afternoon "just works".
 
 **Step 1 — build a Jenkins image that can use Docker**
 
@@ -468,7 +468,7 @@ USER jenkins
 Line by line — all Docker knowledge you already have:
 - `FROM jenkins/jenkins:lts-jdk17` — start from the official Jenkins image. `lts` is Long Term Support, the stable release line
 - `USER root` — switch to root, because installing packages needs admin rights
-- `RUN apt-get update && apt-get install -y docker.io` — install the Docker **command-line tool** (not a whole Docker engine). The `&&` is from Session 2: only install if the update succeeded. The `-y` is the "no interactive prompts" flag we met in the same session — **essential in a Dockerfile, because there's nobody there to answer**
+- `RUN apt-get update && apt-get install -y docker.io` — install the Docker **command-line tool** (not a whole Docker engine). The `&&` is from Session 2: only install if the update succeeded. The `-y` is the "no interactive prompts" 
 - `rm -rf /var/lib/apt/lists/*` — delete the downloaded package index to keep the image smaller. Chained into the same `RUN` deliberately, so the cleanup happens in the same layer as the download
 - `USER jenkins` — drop back to the unprivileged user
 
@@ -506,14 +506,12 @@ Every flag, and they're all revision:
 - `-p 8080:8080` — **port mapping**, `host:container`. Traffic to port 8080 on your laptop forwards to 8080 inside the container, where the Jenkins web interface listens
 - `-p 50000:50000` — the port Jenkins uses to talk to agents. Unused today, but standard
 - `-v jenkins_home:/var/jenkins_home` — a **named volume**. Everything Jenkins saves (config, jobs, plugins, your user) lives at `/var/jenkins_home` inside the container; this maps it to storage Docker manages on your laptop, which survives the container being deleted
-- `-v /var/run/docker.sock:/var/run/docker.sock` — this one's different. It mounts your laptop's **Docker socket** into the container. The socket is the "phone line" the `docker` command uses to reach the Docker engine. Handing it in means Jenkins can run `docker build` using **your laptop's** Docker. **This is what makes the capstone possible**
+- `-v /var/run/docker.sock:/var/run/docker.sock` — this one's different. It mounts your laptop's **Docker socket** into the container. The socket is the "phone line" the `docker` command uses to reach the Docker engine. Handing it in means Jenkins can run `docker build` using **your laptop's** Docker. **This is what makes the eventual build possible**
 - `-u root` — run as root to sidestep Docker permission faff. Fine for training; **not** production practice
 - `jenkins-docker` — the image we just built
 
-**ASK** <br>
-Look at that socket mount. Jenkins is running *inside* a container, but it's about to build Docker images. Is it running Docker inside Docker? <br>
-**ANSWER** <br>
-**No** — and this catches people out. Jenkins has only the docker *client* inside it. The socket mount lets that client talk to the Docker **engine running on your laptop**, outside the container. So when the pipeline builds an image, that image appears in *your* `docker images` list, not in some nested world. It's often called "Docker-out-of-Docker". The practical consequence: **your laptop's disk fills up with images your pipeline builds**, which is worth knowing at 16:00 when someone's build fails on space.
+Look at that socket mount. Jenkins is running *inside* a container, but it's about to build Docker images. <br>
+Jenkins has only the docker *client* inside it. The socket mount lets that client talk to the Docker **engine running on your laptop**, outside the container. So when the pipeline builds an image, that image appears in *your* `docker images` list, not in some nested world. It's often called "Docker-out-of-Docker". The practical consequence: **your laptop's disk fills up with images your pipeline builds**, which is worth knowing at 16:00 when someone's build fails on space.
 
 **NOTE FOR TRAINERS** <br>
 On Docker Desktop for Mac and for Windows (WSL2 backend), `/var/run/docker.sock` is exposed and the socket mount works as written — the reliable cross-platform path. `-u root` is a deliberate simplification avoiding the docker-group permission dance; call it out honestly as a training shortcut so nobody copies it into a real setup. <br>
@@ -524,10 +522,10 @@ Check it's running:
 
 *(Run from `~/jenkins-training`)*
 ```bash
-docker ps
+docker container ls
 ```
 
-You should see a container named `jenkins`, status "Up". If not: `docker ps -a` shows stopped containers, `docker logs jenkins` says why it fell over.
+You should see a container named `jenkins`, status "Up". If not: `docker cotnainer ls -a` or `docker ps -a` shows stopped containers, `docker logs jenkins` says why it fell over.
 
 **Step 3 — unlock and set up**
 
@@ -560,13 +558,15 @@ Point these out on your own screen:
 
 - **Dashboard** — home; every job shows here with recent status (blue/green passing, red failing)
 - **New Item** (top left) — create a job. "Item" is just Jenkins' word for a job
-- **Manage Jenkins** (left sidebar) — the settings hub. Three areas matter:
+- **Manage Jenkins** (cog - top right) — the settings hub. Three areas matter:
   - **Plugins** — almost everything Jenkins can do comes from plugins. The "suggested" set is only a starter kit
   - **Credentials** — a secure vault for secrets. We use this properly this afternoon
   - **Nodes** — where build machines are listed
 - **Build History** (left sidebar) — every build across all jobs
 
 **HANDS ON (35 min)** <br>
+
+- `SLIDE ACROSS`
 
 Part A *(20 min)* — get it running.
 1. *(Run from the starter repo's `jenkins-image` folder)* Build the image as `jenkins-docker`
@@ -681,10 +681,6 @@ echo "The time is: $(date)"
 
 There it is — the exact output of your shell commands, captured and shown in a browser. That's the entire heart of Jenkins: it ran your steps somewhere, and kept the log.
 
-**ASK** <br>
-Where in an *earlier* session did we see almost exactly this — shell commands running unattended, where you only see what happened by reading a log afterwards? <br>
-**ANSWER** <br>
-`cron`, from Session 2. A scheduled, unattended script whose output you only see by checking a log file. Jenkins' Console Output does the same job with a proper interface and a lot more built around it. If you understood why cron needs logging, you already understand why Jenkins keeps build logs.
 
 **The workspace and built-in variables**
 
@@ -719,7 +715,7 @@ A different number each run — `$BUILD_NUMBER` increases by one every build. Je
 
 **Keeping the output — artifacts**
 
-Right now `result.txt` is buried in a workspace folder. An **artifact** is a file a build produces that you want to keep and download.
+Right now `result.txt` is buried in a workspace folder. To introduce new terminology, an **artifact** is a file a build produces that you want to keep and download.
 
 *(In the Jenkins UI — the `hello-jenkins` job)*
 - **Configure** → **Post-build Actions** → **Add post-build action** → **Archive the artifacts**
@@ -730,10 +726,10 @@ Right now `result.txt` is buried in a workspace folder. An **artifact** is a fil
 **Making a job trigger itself — cron syntax**
 
 *(In the Jenkins UI — the `hello-jenkins` job)*
-- **Configure** → **Build Triggers** → tick **Build periodically**
+- **Configure** → **Triggers** → tick **Build periodically**
 - **Schedule**: `H/5 * * * *`
 
-That's the cron syntax from Session 2. Five fields:
+That's cron syntax. Five fields:
 
 ```
  minute  hour  day-of-month  month  day-of-week
@@ -748,7 +744,7 @@ Jenkins adds a twist: **`H` means "hash"** — it spreads load. `H/5` still mean
 
 **The catch with Freestyle — and why we're about to leave it**
 
-We have a working job. Let's poke at it the way we poke at everything on this course.
+We have a working job. Let's poke at it.
 
 **ASK** <br>
 All that configuration — the shell commands, the archive setting, the trigger schedule — where does it actually *live*? <br>
@@ -756,11 +752,12 @@ All that configuration — the shell commands, the archive setting, the trigger 
 Inside Jenkins, in its own internal config (in that `jenkins_home` volume). **Not** in your Git repository.
 
 **ASK** <br>
-You review every line of application code through a pull request. Would you accept a colleague changing the **build process** with no review, no diff and no history? <br>
-**ANSWER** <br>
-Obviously not — and yet that's exactly what a Freestyle job allows. Someone clicks, and it's live for everyone immediately. No version history of how the build changed, no review, no way to copy it to another project, no way to run different behaviour per branch, and no undo. **It's ClickOps all over again** — the exact problem we called out with the Azure Portal, wearing a Jenkins costume.
+You review every line of application code through a pull request. You wouldn't accept a colleague changing the **build process** with no review, no diff and no history? <br>
+That's exactly what a Freestyle job allows. Someone clicks, and it's live for everyone immediately. No version history of how the build changed, no review, no way to copy it to another project, no way to run different behaviour per branch, and no undo. **It's ClickOps all over again** — the exact problem we called out with the Azure Portal, but with Jenkins instead.
 
 That gap is what **Pipelines** fix, and it's where we go next.
+
+- `SLIDE ACROSS`
 
 **HANDS ON (40 min)** <br>
 
@@ -828,19 +825,24 @@ Jenkins stopped the moment a step returned a non-zero exit code. That's the **ex
 
 <br>
 <br>
+
 ### 12:15–13:00 — Pipeline as Code: Your First `Jenkinsfile`
 *(Activity: 20 min + challenge)*
+
+We're going to move on and have our pipeline configuration in our source code instead. 
 
 Here's the big shift. Instead of configuring a job by clicking, we describe the whole pipeline in a **text file** called a `Jenkinsfile`, and keep it **in Git, alongside the code it builds**.
 
 **ASK** <br>
 Where have we seen this exact philosophy already? <br>
 **ANSWER** <br>
-Everywhere this course goes: the bash scripts from Session 2, the Dockerfile that defines an image, and — coming in Session 5 — Terraform's `.tf` files. Same instinct every time: the desired thing described as **reviewable, versioned, repeatable code**, not clicked together and forgotten.
+Everywhere this course goes: the bash scripts from Session 2, the Dockerfile that defines an image, and tomorrow — Terraform's `.tf` files. Same instinct every time: the desired thing described as **reviewable, versioned, repeatable code**, not clicked together and forgotten.
 
 #### A word on the syntax before we write any
 
 A `Jenkinsfile` is written in **Groovy**. You don't need to learn Groovy — we use a restricted, structured subset called **Declarative Pipeline**, which is really just nested blocks. But three bits will look unfamiliar, so let's name them.
+
+- `SLIDE ACROSS`
 
 **1. Everything is a block, marked by `{ }`.** A named container holding other things, nested like Russian dolls:
 
@@ -861,6 +863,8 @@ pipeline {        // outermost block
 **2. `sh` runs a shell command.** `sh 'npm install'` is exactly like typing `npm install` in a terminal. It's how a pipeline actually *does* anything. (There's also `bat` for Windows batch — we won't need it, because our Jenkins runs in a Linux container.)
 
 **3. Single quotes and double quotes behave differently.** This is the one that genuinely catches people out, so it's worth doing carefully:
+
+- `SLIDE ACROSS`
 
 | Written as | Behaviour |
 |---|---|
@@ -938,12 +942,14 @@ pipeline {
 }
 ```
 
-- **Save** → **Build Now**, and watch the Stage View show **two** boxes lighting up green in order.
+- **Save** → **Build Now**, click on `#2` and then **Pipeline Overview**
 
 **ASK** <br>
 Why is it useful that each stage shows separately, rather than the whole build being just "passed" or "failed"? <br>
 **ANSWER** <br>
 When something breaks you instantly see **where**. "Test failed" tells you far more than "the build failed". On a real pipeline with checkout, build, test, package and deploy, that pinpointing saves real time — and it's why we split work into named stages even when we could cram it into one. It's the same reason you write focused unit tests rather than one giant test called "everything works".
+
+- `SLIDE ACROSS`
 
 **HANDS ON (20 min)** <br>
 *(All in the Jenkins UI — the `hello-pipeline` job)*
