@@ -33,3 +33,25 @@
 <img src="./images/03-jenkins-ci-cd/jenkins-challenge-pipeline.png">
 
 ---
+
+<img src="./images/03-jenkins-ci-cd/<add>">
+
+---
+
+
+<img src="./images/03-jenkins-ci-cd/<add>">
+
+---
+
+
+<img src="./images/03-jenkins-ci-cd/<add>">
+
+---
+
+<img src="./images/03-jenkins-ci-cd/<add>">
+
+---
+
+<img src="./images/03-jenkins-ci-cd/<add>">
+
+---

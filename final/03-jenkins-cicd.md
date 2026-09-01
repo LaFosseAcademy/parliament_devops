@@ -1135,9 +1135,11 @@ Run it three or four times and watch it alternate red, green, red, green — and
 ### 14:00–14:45 — Anatomy of a Pipeline: Stages, Environment, Post, Parallel
 *(Activity: 20 min)*
 
-This morning you saw the *shape* of a pipeline. Now the toolkit — the handful of blocks that appear in almost every real `Jenkinsfile`.
+This morning you saw the *shape* of a pipeline. Now let's look at the toolkit — the handful of blocks that appear in almost every real `Jenkinsfile`.
 
 **Environment variables — name a value once, reuse it**
+
+- `SLIDE ACROSS`
 
 ```groovy
 pipeline {
@@ -1162,12 +1164,10 @@ pipeline {
 - `APP_NAME = 'countries-api'` — assignment. Note Groovy **does** use spaces around `=`, unlike bash. Small difference, endless confusion
 - `echo "${GREETING} ${APP_NAME}..."` — **double quotes**, because we want values substituted
 
-**ASK** <br>
-Where have you already used this exact idea? <br>
-**ANSWER** <br>
-Bash variables in Session 2, and Terraform `variable` blocks in Session 5. Same concept, three different punctuations. Once you see it's the *same* idea, each new tool's version takes thirty seconds to learn rather than an hour.
 
 **Parameters — let a human feed input at build time**
+
+- `SLIDE ACROSS`
 
 ```groovy
 pipeline {
@@ -1193,11 +1193,11 @@ pipeline {
 
 Once a pipeline has `parameters`, the button changes from **Build Now** to **Build with Parameters**.
 
-**NOTE FOR TRAINERS** <br>
-Flag this gotcha *before* students hit it: the **first** build after adding a `parameters` block still runs with defaults and shows a plain "Build Now" — Jenkins must run the pipeline once to *discover* the parameters exist. From the second build you get the prompt. Students reliably conclude they've done it wrong. <br>
-**END OF NOTE**
+Do note though that Jenkins may need to run the pipeline once to *discover* the parameters exist. From the second build you get the prompt **Build with Parameters**.
 
 **The `post` section — do something after, based on the outcome**
+
+- `SLIDE ACROSS`
 
 ```groovy
 pipeline {
@@ -1229,7 +1229,7 @@ pipeline {
 - `success { }` — only if everything passed
 - `failure { }` — only if something broke
 - `always { }` — no matter what. Good for cleanup, or publishing test reports
-- `unstable` and `changed` also exist — `changed` fires only when the result **differs from the previous build**, which is how you avoid spamming a channel every night with "still broken"
+- `unstable` and `changed` also exist — `changed` fires only when the result **differs from the previous build**, which is how you avoid spamming a channel every night with "still broken". `unstable` means there were errors but non-which were fatal. 
 
 **ASK** <br>
 In a real team, what would you actually want in that `failure` block instead of an `echo`? <br>
@@ -1237,6 +1237,8 @@ In a real team, what would you actually want in that `failure` block instead of 
 A notification — a Slack message to the team channel, an email, a page to whoever's on call, maybe auto-opening a ticket. The whole point of CI is **fast feedback**, and a failure nobody's told about is slow feedback. A pipeline that goes red in a browser tab nobody has open is barely better than no pipeline.
 
 **Parallel stages — run independent work at the same time**
+
+- `SLIDE ACROSS`
 
 ```groovy
 stages {
@@ -1267,7 +1269,9 @@ There's a job type called a **Multibranch Pipeline** that scans a whole repo and
 **ASK** <br>
 Why is that a perfect fit for the Pull Request workflow you already use? <br>
 **ANSWER** <br>
-Because every feature branch and every open PR automatically gets its own build and test run, with zero manual job creation. That's exactly the mechanism behind "the tests must pass before we allow a merge" — the green tick you've all seen on a GitHub PR. And in Session 5 it becomes "run `terraform plan` on every PR so a reviewer can see what would change to real infrastructure". We won't wire it up today, but know the term.
+Because every feature branch and every open PR automatically gets its own build and test run, with zero manual job creation. That's the mechanism behind "the tests must pass before we allow a merge" — the green tick you've all seen on a GitHub PR.
+
+- `SLIDE ACROSS`
 
 **HANDS ON (20 min)** <br>
 *(All in the Jenkins UI — the `hello-pipeline` job → **Configure**)*
@@ -1381,14 +1385,16 @@ Our `Jenkinsfile` is still pasted into the Jenkins UI — the *exact same* "not 
 
 **Pulling the `Jenkinsfile` from Git**
 
-*(In the Jenkins UI — a Pipeline job → **Configure**)*
+*(In the Jenkins UI — `hello-pipeline` → **Configure**)*
 - Scroll to the **Pipeline** section
 - Change **Definition** from `Pipeline script` to **Pipeline script from SCM**
 
 *(SCM = "Source Control Management", Jenkins' generic term for Git and its older cousins.)*
 
 - **SCM**: `Git`
-- **Repository URL**: your fork
+- **Repository URL**: let's all create a repo from the `app` folder in the student facing repo.
+  - I'll call my repo: `jenkins-cdcd`
+  - Take the URL and add it to Jenkins config
 - **Branch Specifier**: `*/main` — the `*/` prefix means "the `main` branch from whichever remote", so it matches `origin/main`
 - **Script Path**: `Jenkinsfile` — path within the repo. The default assumes the repo root
 
@@ -1398,30 +1404,30 @@ Now the pipeline definition lives in Git: versioned, reviewable in a PR, identic
 
 To pull a private repo, or push to Docker Hub later, Jenkins needs secrets. We never paste those into a config box or into the `Jenkinsfile`.
 
+- Save configuration
+
 *(In the Jenkins UI — Dashboard)*
 - **Manage Jenkins → Credentials → System → Global credentials (unrestricted) → Add Credentials**
-- We set one up properly in the capstone
+- We set one up properly later on
 
-**ASK** <br>
-Why store a token in the vault rather than typing it into the repository URL field, or the `Jenkinsfile`? <br>
-**ANSWER** <br>
-Three reasons, and the third is the one people miss. **(1)** The vault keeps the secret out of Git — and **Git history is permanent**, so deleting the line later doesn't remove it. **(2)** It lets you rotate the secret in one place without editing code. **(3)** Jenkins **automatically masks** the value in build logs. Without that, any `sh` step that happened to echo the variable would print your live credential into a log that everyone in the team can read. That third one is why an environment variable isn't good enough.
+There's three main reasons we could use this for keeping our credentials. <br>
+
+**(1)** The vault keeps the secret out of Git — and **Git history is permanent**, so deleting the line later doesn't remove it. **(2)** It lets you rotate the secret in one place without editing code. **(3)** Jenkins **automatically masks** the value in build logs. Without that, any `sh` step that happened to echo the variable would print your live credential into a log that everyone in the team can read. That third one is why an environment variable isn't good enough.
 
 **Triggering builds automatically**
 
 The magic of CI is that **nobody clicks Build**. A change to Git triggers it. Two ways:
 
-- **Poll SCM** — Jenkins checks the repo on a schedule (cron syntax again) and builds only if something changed. Simple, works anywhere, but there's a delay and it's a bit wasteful
+- **Poll SCM** — Jenkins checks the repo on a schedule (using that cron syntax again) and builds only if something changed. Simple, works anywhere, but there's a delay and it's a bit wasteful
 - **Webhook** — GitHub *tells* Jenkins the instant a push happens. Instant, efficient, how real setups do it
 
 **ASK** <br>
 Between polling every minute and a webhook, which is better and why? <br>
 **ANSWER** <br>
-The webhook. Polling means repeatedly asking "anything changed yet?" when the answer is almost always no — wasted requests, plus a delay of up to the polling interval. A webhook is push rather than pull: GitHub notifies Jenkins the moment something happens. It's the same argument as polling an API versus subscribing to events, which you've all met in frontend work.
+The webhook. Polling means repeatedly asking "anything changed yet?" when the answer is almost always no — wasted requests, plus a delay of up to the polling interval. A webhook is push rather than pull: GitHub notifies Jenkins the moment something happens.
 
-**NOTE FOR TRAINERS** <br>
-The local-laptop reality: a webhook from GitHub **cannot** reach `http://localhost:8080` on a student's machine, because GitHub is on the public internet and their Jenkins isn't. The proper fix is a tunnel like [ngrok](https://ngrok.com/), which is a good optional stretch. For the guaranteed-to-work classroom path we use **Poll SCM** in the capstone — no networking magic, same principle demonstrated. Teach the webhook as the goal; use polling as the hands-on. <br>
-**END OF NOTE**
+Unfortunately a webhook from GitHub **cannot** reach `http://localhost:8080` on our machines, because GitHub is on the public internet and Jenkins isn't running on the public internet. <br>
+The proper fix is a tunnel like [ngrok](https://ngrok.com/) which will connect the public internet to a port on our machine. We're going to avoid that for now and we'll use **Poll SCM**.
 
 <br>
 <br>
@@ -1430,6 +1436,7 @@ The local-laptop reality: a webhook from GitHub **cannot** reach `http://localho
 
 <br>
 <br>
+
 ### 15:15–16:45 — Capstone: A Real Test → Build → Push Pipeline
 *(Activity: 90 min)*
 
