@@ -1664,10 +1664,11 @@ variable "iam_user_name_prefix" {
 
 And use it:
 
+**resource.tf**
 ```tf
 resource "azuread_user" "my_azuread_user" {
   # UPDATED — remember: YOUR domain
-  user_principal_name = "${var.iam_user_name_prefix}_def@jbloggs.onmicrosoft.com"
+  user_principal_name = "${var.iam_user_name_prefix}_def@emilesherrottgmail.onmicrosoft.com"
   display_name        = "${var.iam_user_name_prefix}_def"
   mail_nickname       = "${var.iam_user_name_prefix}_def"
   password            = "ChangeMe123!ChangeMe"
@@ -1683,7 +1684,7 @@ Two pieces of new syntax:
 **ASK** <br>
 Where have you seen `${ }` before? <br>
 **ANSWER** <br>
-**JavaScript template literals** — and in the Jenkins session, and bash uses `${VAR}` too. Same concept everywhere: drop the value of an expression into the middle of a string. HCL borrows the idea wholesale, which is why it needs about ten seconds of explanation rather than ten minutes.
+**JavaScript template literals** — and in the Jenkins session, and bash uses `${VAR}` too. Same concept everywhere: drop the value of an expression into the middle of a string. HCL borrows the idea wholesale.
 
 One subtlety: you only need `${ }` when the value is **inside a larger string**. If the whole value is just the variable, write it bare:
 
@@ -1697,10 +1698,11 @@ display_name = "${var.iam_user_name_prefix}"     # works, but redundant
 terraform apply -refresh=false
 ```
 
-No changes — the interpolated result is identical to the constant it replaced.
+The result is identical to the variable it replaced.
 
 #### Typing variables
 
+**main.tf**
 ```tf
 variable "iam_user_name_prefix" {
   # NEW CONFIG
@@ -1710,6 +1712,8 @@ variable "iam_user_name_prefix" {
 ```
 
 The available types:
+
+- `SLIDE ACROSS`
 
 | Type | Meaning |
 |---|---|
@@ -1723,12 +1727,13 @@ The available types:
 | `map` | key/value pairs — like a JS object |
 
 **ASK** <br>
-`list`, `set` and `map` should all be familiar. What are they in JavaScript? <br>
+`list`, `set` and `map` might all be familiar to anyone who's used Python. What are they in JavaScript? <br>
 **ANSWER** <br>
-`list` is an **Array**, `set` is a **Set**, `map` is an **Object** (or a `Map`). And the distinctions matter for the same reasons: a Set enforces uniqueness and doesn't preserve order; an Object gives you key-based lookup. **This afternoon that distinction stops being academic** — choosing a list versus a set changes whether Terraform destroys and recreates your infrastructure.
+`list` is an **Array**, `set` is a **Set**, `map` is an **Object** (or a `Map`). And the distinctions matter for the same reasons: a Set enforces uniqueness and doesn't preserve order; an Object gives you key-based lookup. Choosing a list versus a set changes whether Terraform destroys and recreates your infrastructure.
 
 Watch a mismatch:
 
+**main.tf**
 ```tf
 variable "iam_user_name_prefix" {
   type    = number     # deliberately wrong
@@ -1745,7 +1750,7 @@ How can we check whether our configuration is sound, without touching Azure? <br
 ```bash
 terraform validate
 ```
-![intro-to-terraform-37](./resources/intro-to-terraform-37.png)
+
 
 Set it back to `string`.
 
@@ -1763,7 +1768,7 @@ variable "iam_user_name_prefix" {
 terraform validate     # -> Valid! Interesting.
 terraform apply -refresh=false
 ```
-![intro-to-terraform-39](./resources/intro-to-terraform-39.png)
+
 
 Terraform **prompts you interactively** for the value. A variable without a default isn't an error — it's just **required**.
 
@@ -1772,7 +1777,7 @@ Terraform **prompts you interactively** for the value. A variable without a defa
 **ASK** <br>
 That prompt is quite friendly. Where would it be a serious problem? <br>
 **ANSWER** <br>
-In a **pipeline**. A Jenkins build has no human to type an answer, so it hangs until it times out. Same trap as the `read -p` prompt in Session 2 and the missing `-y` on `apt install`: **convenient by hand, fatal in automation.** In CI you always supply variables non-interactively — which is exactly what we're about to cover.
+In a **pipeline**. A Jenkins build has no human to type an answer, so it hangs until it times out. 
 
 *UNCOMMENT THE DEFAULT VALUE*
 
@@ -1788,13 +1793,11 @@ export TF_VAR_iam_user_name_prefix=FROM_ENV_VARIABLE_IAM_PREFIX
 export | grep TF_VAR
 terraform plan -refresh=false
 ```
-![intro-to-terraform-41](./resources/intro-to-terraform-41.png)
+
 
 The rule is `TF_VAR_` followed by the **exact** variable name. Remove it again with `unset TF_VAR_iam_user_name_prefix`.
 
-**NOTE FOR TRAINERS** <br>
-Flag this hard: if a student ever sees a `plan` proposing changes they can't explain, **a forgotten `TF_VAR_` environment variable in that terminal is a very common culprit** — and it's invisible in the code. Teach `export | grep TF_VAR` as the first diagnostic. <br>
-**END OF NOTE**
+If a you ever see a ` terraformplan` proposing changes they can't explain, **a forgotten `TF_VAR_` environment variable in that terminal is a very common culprit** — and it's invisible in the code. 
 
 **3. A `terraform.tfvars` file:**
 
@@ -1810,7 +1813,6 @@ iam_user_name_prefix = "VALUE_FROM_TERRAFORM_TFVARS"
 ```bash
 terraform plan -refresh=false
 ```
-![intro-to-terraform-42](./resources/intro-to-terraform-42.png)
 
 Note there's **no `variable` keyword** in a `.tfvars` file — just `name = value`. Declared in `.tf`, assigned here.
 
@@ -1821,27 +1823,26 @@ Note there's **no `variable` keyword** in a `.tfvars` file — just `name = valu
 terraform plan -refresh=false -var="iam_user_name_prefix=VALUE_FROM_CLI"
 ```
 
-**Precedence, lowest to highest:**
+**If you have variables defined the 4 different ways, from lowest to highest prioirty:**
 1. `default` in the variable block
 2. `TF_VAR_` environment variables
 3. `terraform.tfvars`
 4. `-var` on the command line
 
-There's also `-var-file`, for pointing at a specific file:
-```bash
-terraform apply -var-file="prod.tfvars"
-```
+
 
 **ASK** <br>
 Why is that ordering the *right* way round? <br>
 **ANSWER** <br>
-Because **the more specific and deliberate the instruction, the higher it wins.** A `default` is "if nobody says otherwise". An environment variable is per-machine. A `.tfvars` file is per-project. A `-var` flag is someone typing an explicit override right now, so it beats everything. It's the same hierarchy as CSS specificity, or config files versus command-line flags in any tool you've used.
+Because **the more specific and deliberate the instruction, the higher it wins.** A `default` is "if nobody says otherwise". An environment variable is per-machine. A `.tfvars` file is per-project. A `-var` flag is someone typing an explicit override right now, so it beats everything. It's the same hierarchy as CSS specificity.
 
 #### Why variables actually matter
 
 The reason we spend time on this: **the same Terraform configuration gets used across multiple environments.** You'll provision Development, Test and Production — and you do *not* want three copies of the code that can drift apart.
 
 A common pattern is an `environment` variable woven into resource names:
+
+- `SLIDE ACROSS`
 
 ```tf
 variable "environment" {
@@ -1857,7 +1858,7 @@ resource "azuread_user" "my_azuread_user" {
 
 More practically you'd also use it to vary **scale** — one small VM in test, six large in production — and **location**, standing up the same stack in a different region by changing one value. `dev.tfvars`, `test.tfvars`, `prod.tfvars`: one configuration, three sets of values.
 
-*DELETE THE `environment` VARIABLE AND REVERT THE NAMES*, then `terraform validate`.
+*DELETE THE `terraform.tfvars` VARIABLE AND REVERT THE NAMES*, then `terraform validate`.
 
 #### A few more commands worth knowing
 
@@ -1865,7 +1866,7 @@ More practically you'd also use it to vary **scale** — one small VM in test, s
 
 **`terraform show`** — prints Known State readably, far friendlier than raw JSON.
 
-**`terraform validate`** — syntax and internal consistency, without contacting Azure. Fast, and pipeline-friendly.
+- `SLIDE ACROSS`
 
 **HANDS ON (20 min)** <br>
 *(Run from `~/terraform-training/01-terraform-basics`)*
@@ -2008,7 +2009,7 @@ provider "azuread" {}
 resource "azuread_user" "my_azuread_users" {
   # NEW CONFIG
   count               = 2
-  user_principal_name = "my_iam_user_${count.index}@jbloggs.onmicrosoft.com"
+  user_principal_name = "my_iam_user_${count.index}@emilesherrottgmail.onmicrosoft.com"
   display_name        = "my_iam_user_${count.index}"
   mail_nickname       = "my_iam_user_${count.index}"
   password            = "ChangeMe123!ChangeMe"
@@ -2019,7 +2020,7 @@ Note the internal name is now **plural** — `my_azuread_users`. It represents m
 
 `count = 2` is a **meta-argument** — an argument Terraform itself understands, available on *any* resource type regardless of provider. "Make this many copies of this block."
 
-`count.index` is then available inside the block, holding the current iteration number, **starting at 0**. Without something varying per copy, you'd be creating two identical users — and `user_principal_name` must be unique.
+`count.index` is then available inside the block, which holds the current iteration number, **starting at 0**. Without something varying per copy, you'd be creating two identical users — and `user_principal_name` must be unique.
 
 **ASK** <br>
 What do we need to run first in this new folder, and why? <br>
@@ -2041,9 +2042,9 @@ Now change `count = 2` to `count = 3`:
 ```bash
 terraform apply
 ```
-![intro-to-terraform-26](./resources/intro-to-terraform-26.png)
 
-**This is the declarative model in one screenshot.** You didn't say "add one more". You said "there should be 3". Terraform checked state, found 2, and worked out that **one creation** gets you there.
+
+**This is the declarative model in one output.** You didn't say "add one more". You said "there should be 3". Terraform checked state, found 2, and worked out that **one creation** gets you there.
 
 - Type: `yes`
 
@@ -2057,9 +2058,9 @@ terraform console
 azuread_user.my_azuread_users
 azuread_user.my_azuread_users[0].user_principal_name
 ```
-![intro-to-terraform-27](./resources/intro-to-terraform-27.png)
 
-The reference now returns a **list** — because `count` produced many. So you index into it and chain attributes, exactly like a JavaScript array.
+
+The first output reference now returns a **list** — because `count` produced many. So you index into it and chain attributes, exactly like a JavaScript array.
 
 Exit with `Ctrl + C`.
 
@@ -2070,6 +2071,7 @@ Exit with `Ctrl + C`.
 
 <br>
 <br>
+
 ### 15:15–16:45 — Capstone: Lists, Sets, `for_each` and Maps
 *(Activity: 90 min)*
 
@@ -2111,7 +2113,7 @@ terraform {
 provider "azuread" {}
 
 variable "names" {
-  default = ["emile", "romeo", "sarah"]
+  default = ["emile", "joseph", "mudathir", "guled"]
 }
 
 resource "azuread_user" "my_azuread_users" {
@@ -2125,8 +2127,8 @@ resource "azuread_user" "my_azuread_users" {
 
 New syntax:
 
-- `default = ["emile", "romeo", "sarah"]` — a **list**, square brackets. A JavaScript array, indexed from 0
-- `length(var.names)` — a **built-in function**. In JavaScript you'd write `names.length`; HCL uses function-call syntax: `length(thing)`. It evaluates to 3, so `count.index` runs 0, 1, 2
+- `default = ["emile", "jospeh", "mudathir", "guled"]` — a **list**, square brackets. A JavaScript array, indexed from 0
+- `length(var.names)` — a **built-in function**. In JavaScript you'd write `names.length`; HCL uses function-call syntax: `length(thing)`. It evaluates to 4, so `count.index` runs 0, 1, 2, 3
 - `var.names[count.index]` — index into the list using the current iteration number
 
 Notice `display_name = var.names[count.index]` has **no** `${ }` — the whole value *is* the expression. But `user_principal_name` needs it, because the value is embedded in a larger string alongside `@domain`.
@@ -2137,15 +2139,16 @@ terraform init
 terraform apply
 ```
 
-*WHILST IT'S RUNNING, SAY:*
+- Type: `yes`
 
-Worth explaining why we keep making new project folders. It's **Terraform best practice** — a single application commonly has several separate Terraform projects, because different resources have different **lifecycles**.
+
+
+We keep making new project folders for a reason. It's **Terraform best practice** — a single application commonly has several separate Terraform projects, because different resources have different **lifecycles**.
 
 A storage account might live for years, holding logs, assets and backups. A deployment might change daily. Grouping resources by how often they change, and managing each group as its own project with its own state, means a daily deployment change can never accidentally destroy the storage everything depends on. It also keeps `plan` fast and limits blast radius.
 
-![intro-to-terraform-44](./resources/intro-to-terraform-44.png)
 
-- Type: `yes`
+
 
 Explore in the console:
 
@@ -2161,24 +2164,27 @@ azuread_user.my_azuread_users[0].display_name
 
 While you're here, meet the **collection functions**:
 
+*Run in console*
 ```
-length(var.names)                     # 3
-reverse(var.names)                    # reverses the order
-distinct(var.names)                   # removes duplicates
-toset(var.names)                      # converts to a set
-concat(var.names, ["tom", "astha"])   # joins two lists
-contains(var.names, "simon")          # true / false
-sort(var.names)                       # alphabetical
+length(var.names)                        # 4
+reverse(var.names)                       # reverses the order
+distinct(var.names)                      # removes duplicates
+toset(var.names)                         # converts to a set
+concat(var.names, ["manish", "monia"])   # joins two lists
+contains(var.names, "simon")             # true / false
+sort(var.names)                          # alphabetical
 ```
 
-**ASK** <br>
+**ASK YOURSELF** <br>
 Look at that list of functions. What do they remind you of? <br>
-**ANSWER** <br>
+
 **JavaScript array methods** — `.length`, `.reverse()`, `.concat()`, `.includes()`, `.sort()`, and `new Set()`. Nearly one-for-one. The only real difference is **syntax**: HCL puts the collection *inside* the function call rather than calling a method on it. So `names.sort()` becomes `sort(var.names)`. If you know the array methods, you already know most of this.
 
 Note `distinct` returns `tolist([...])` — Terraform being explicit that it produced a list.
 
 And `range` for sequences:
+
+*Run in console*
 ```
 range(10)          # 0 to 9
 range(1, 12)       # 1 up to but not including 12
@@ -2191,30 +2197,33 @@ Exit with `Ctrl + C`. Get into the habit of checking the [function documentation
 
 #### Part 2 (≈20 min) — The problem with lists
 
-**This is the exercise that makes the whole afternoon click.** Add a name to the **front** of the list:
+**This section is the one of the main takeaways for today.** Add a name to the **front** of the list:
 
 **main.tf**
 ```tf
 variable "names" {
   # UPDATED
-  default = ["simon", "emile", "romeo", "sarah"]
+  default = ["bukayo", "emile", "joseph", "mudathir", "guled"]
 }
 ```
 
-**Before running anything — predict what will happen.** We added one name to a list of three. Write down what you expect the plan to say. Ask two or three people out loud.
+**Before running anything — predict what will happen.** We added one name to a list of four.
 
 *(Run from `~/terraform-training/03-lists-and-sets`)*
 ```bash
 terraform apply
 ```
-![intro-to-terraform-57](./resources/intro-to-terraform-57.png)
 
-**1 to add… but 3 to change.**
+- *Read outout don't type 'yes'*
 
-**ASK** <br>
-We added exactly one name. Why is Terraform changing three existing users? <br>
+**1 to add… but 4 to change.**
+
+**ASK YOURSELF** <br>
+Why is Terraform changing four existing users? <br>
 **ANSWER** <br>
-Because `count` tracks resources by **position**, not identity. Everything shifted: `simon` now occupies index 0 where `emile` was, `emile` moved to 1, `romeo` to 2 — so Terraform sees each slot as having *changed value*, and index 3 as brand new. It has no concept that "emile" is the same person who was there before; it only knows "the resource at index 0 used to be emile and should now be simon".
+Because `count` tracks resources by **position**, not identity. Everything shifted: `bukayo` now occupies index 0 where `emile` was, `emile` moved to 1, `joseph` to 2 — so Terraform sees each slot as having *changed value*, and index 4 (Guled's position) as brand new. It has no concept that "emile" is the same person who was there before; it only knows "the resource at index 0 used to be emile and should now be joe".
+
+- *Cancel the `terraform apply`*
 
 Look in the state file to see exactly why:
 
@@ -2227,26 +2236,20 @@ Look in the state file to see exactly why:
   },
   {
     "index_key": 1,
-    "attributes": { "display_name": "romeo" }
+    "attributes": { "display_name": "joseph" }
   },
   {
     "index_key": 2,
-    "attributes": { "display_name": "sarah" }
+    "attributes": { "display_name": "mudathir" }
   }
 ]
 ```
 
 The `index_key` is a **number**. That number is the only thing joining your configuration to the real Azure object. Reorder the list and every mapping is wrong.
 
-**ASK** <br>
-Where have you seen exactly this bug before, in a completely different context? <br>
-**ANSWER** <br>
-**React's `key` prop.** Using an array index as a key, then inserting an item at the front — React re-renders and mismatches every element after the insertion point, because it identifies children by position rather than identity. React's official advice is "don't use the index as a key, use a stable ID". **It's the identical bug with identical reasoning**, and `for_each` is Terraform's version of "use a stable ID".
 
-**ASK** <br>
-On Azure AD users this is annoying. Where would this be genuinely dangerous? <br>
-**ANSWER** <br>
-Anywhere the resource holds **state** or takes time to build — databases, VMs with data on them, storage accounts. Inserting one item at the top of a list could trigger the destruction and recreation of **every** resource after it. In React the cost is a visual glitch. Here the cost is data loss and downtime. This is the single most common way people get burned by `count`.
+
+On Azure AD users this is annoying. It could be genuinely dangerous anywhere the resource holds **state** or takes time to build — databases, VMs with data on them, storage accounts. Inserting one item at the top of a list could trigger the destruction and recreation of **every** resource after it. 
 
 Destroy before we fix it:
 
@@ -2260,10 +2263,12 @@ terraform destroy
 
 #### Part 3 (≈25 min) — Fixing it with `for_each`
 
+Update **main.tf** with new syntax.
+
 **main.tf**
 ```tf
 variable "names" {
-  default = ["simon", "emile", "romeo", "sarah"]
+  default = ["bukayo", "emile", "joseph", "mudathir", "guled"]
 }
 
 resource "azuread_user" "my_azuread_users" {
@@ -2283,26 +2288,24 @@ resource "azuread_user" "my_azuread_users" {
 The changes:
 
 - `for_each` replaces `count`. The other iteration meta-argument, working over a **set or a map** rather than a number
-- `toset(var.names)` converts our list to a **set**. `for_each` requires unique values, and a list can contain duplicates — so we convert. (A set is unordered and unique-only, exactly like a JavaScript `Set`)
+- `toset(var.names)` converts our list to a **set**. `for_each` requires unique values, and a list can contain duplicates — so we convert. (A set is unordered and unique-only, exactly like a Python `Set`)
 - `each.value` replaces `var.names[count.index]`. Inside a `for_each` block you get `each.value` (the current item) and `each.key`. For a set, key and value are the same thing
 
 *(Run from `~/terraform-training/03-lists-and-sets`)*
 ```bash
 terraform apply
 ```
-![intro-to-terraform-58](./resources/intro-to-terraform-58.png)
 
-Four resources — and notice **the order doesn't match your list**.
+Four resources — and notice **the order doesn't match your list**. (Unlikely that it'll match)
 
 **Sets prioritise uniqueness, not order.** They're implemented with a **hash table**, which doesn't preserve insertion order.
 
-**OPTIONAL SIDE TANGENT**
+**SIDE TANGENT**
 - **Hashing** — each element runs through a hash function, turning it into a numeric fingerprint
 - **Storage** — that fingerprint is used as an address in a table
 - **Lookup** — to check membership, hash it and jump straight to that address
 
-Extremely fast lookups; the price is that ordering isn't retained. Exactly the same trade-off as a JavaScript `Set` or `Object` versus an `Array`.
-**END SIDE TANGENT**
+Extremely fast lookups; the price is that ordering isn't retained.
 
 - Type: `yes`
 
@@ -2312,15 +2315,15 @@ Now look at the state file again:
 ```tf
 "instances": [
   {
-    "index_key": "emile",              # <-- A STRING. The value itself.
+    "index_key": "bukayo",              # <-- A STRING. The value itself.
     "attributes": { "display_name": "emile" }
   },
   {
-    "index_key": "romeo",
+    "index_key": "emile",
     "attributes": { "display_name": "romeo" }
   },
   {
-    "index_key": "simon",
+    "index_key": "guled",
     "attributes": { "display_name": "simon" }
   }
 ]
@@ -2333,7 +2336,7 @@ Prove it. Add a name at the front:
 **main.tf**
 ```tf
 variable "names" {
-  default = ["astha", "simon", "emile", "romeo", "sarah"]
+  default = ["eberechi", "bukayo", "emile", "joseph", "mudathir", "guled"]
 }
 ```
 
@@ -2352,7 +2355,7 @@ And removal behaves properly too:
 **main.tf**
 ```tf
 variable "names" {
-  default = ["emile", "sarah"]
+  default = ["mudathir", "guled"]
 }
 ```
 
@@ -2406,7 +2409,7 @@ provider "azuread" {}
 variable "users" {
   default = {
     emile : "England",
-    sarah : "France"
+    monia : "Brazil"
   }
 }
 
@@ -2449,10 +2452,10 @@ values(var.users)          # just the values
 lookup(var.users, "emile") # find a value by key
 ```
 
-**ASK** <br>
-Both `.sarah` and `["sarah"]` work. Where else is that true? <br>
+**ASK YOURSELF** <br>
+Both `.monia` and `["monia"]` work. Where else is that true? <br>
 **ANSWER** <br>
-**JavaScript objects** — `obj.sarah` and `obj["sarah"]` are interchangeable, with the same caveat that bracket notation is required for keys that aren't valid identifiers. `keys()` and `values()` are `Object.keys()` and `Object.values()`. HCL is borrowing your existing mental model almost wholesale.
+**JavaScript objects** — `obj.monia` and `obj["monia"]` are interchangeable, with the same caveat that bracket notation is required for keys that aren't valid identifiers. `keys()` and `values()` are `Object.keys()` and `Object.values()`. HCL is borrowing your existing mental model.
 
 Exit with `Ctrl + C`, then apply:
 
@@ -2464,7 +2467,10 @@ terraform apply
 
 *(In the Azure Portal — Microsoft Entra ID → Users)* — both users exist, with countries set.
 
-Check the state: `index_key` is the username, same as with a set.
+- *You'll find this by clicking on the created user name and selecting 'Properties' on the horizontal menu.*
+- *It should appear under 'Contact Information' -> 'Country or region'*
+
+Check the state (**terraform.tfstate**): `index_key` is the username, same as with a set.
 
 **Now nest a map inside the map**, so each user carries multiple attributes:
 
@@ -2474,12 +2480,12 @@ variable "users" {
   default = {
     # UPDATED — the value is now ANOTHER MAP
     emile : { country : "England" },
-    sarah : { country : "France" }
+    monia : { country : "Brazil" }
   }
 }
 ```
 
-**ASK** <br>
+**ASK YOURSELF** <br>
 The resource says `country = each.value`. How do we reach the country now? <br>
 **ANSWER** <br>
 `each.value.country` — `each.value` is now an object, so you chain onto it, exactly as in JavaScript.
@@ -2495,6 +2501,7 @@ resource "azuread_user" "my_azuread_users" {
 *(Run from `~/terraform-training/04-maps`)*
 ```bash
 terraform apply
+# type: yes
 ```
 
 **No changes** — the resulting values are identical, even though the route to them changed. **Terraform compares results, not the expressions that produced them.**
@@ -2506,7 +2513,7 @@ Now the payoff — add another attribute:
 variable "users" {
   default = {
     emile : { country : "England", department : "Training" },
-    sarah : { country : "France", department : "Training" }
+    monia : { country : "Brazil", department : "Training" }
   }
 }
 
@@ -2528,6 +2535,8 @@ terraform apply
 
 An in-place update adding the attribute.
 
+*Try finding the Department value added to the User in the Azure Portal*
+
 ---
 
 #### Part 5 — Stretch goals
@@ -2544,8 +2553,8 @@ An in-place update adding the attribute.
 variable "users" {
   default = {
     emile : { country : "England", department : "Training", job_title : "Trainer" },
-    sarah : { country : "France", department : "Training" }
-    romeo : { country : "Italy", department : "Engineering" }
+    monia : { country : "Brazil", department : "Training" }
+    pierre : { country : "Jamaica", department : "People Experience" }
   }
 }
 
@@ -2579,14 +2588,14 @@ output "all_user_principal_names" {
 
 *(Run from `~/terraform-training/04-maps`)*
 ```bash
-terraform apply     # -> 1 to add (romeo), 1 to change (emile gains a job_title)
+terraform apply     # -> 1 to add (pierre), 1 to change (emile gains a job_title)
 # type: yes
 terraform output all_user_principal_names
 ```
 
 **Stretch 4 — drift detection.**
 
-*(In the Azure Portal — Microsoft Entra ID → Users → sarah)* — change **Department** to `Marketing` and save.
+*(In the Azure Portal — Microsoft Entra ID → Users → pierre)* — change **Department** to `Marketing` and save.
 
 *(Run from `~/terraform-training/04-maps`)*
 ```bash
@@ -2597,7 +2606,7 @@ The plan reports **1 to change**, showing `department: "Marketing" -> "Training"
 
 **This is the single strongest argument for Infrastructure as Code.** Your `.tf` files aren't just a record of what you built — **they're the authority.** Anything anyone does by hand gets detected and corrected. That's the ClickOps drift problem from Session 1, solved.
 
-**ASK** <br>
+**ASK YOURSELF** <br>
 Terraform just silently reverted someone's manual change. Is that always what you want? <br>
 **ANSWER** <br>
 Mostly yes — that's the point. But it has a real consequence: **the Portal effectively becomes read-only** for anything Terraform manages. Someone making an emergency fix at 3am in the Portal will find it silently undone by the next pipeline run. Which means the team has to *agree* that Terraform is the authority, and that emergency fixes go through the code. It's a cultural commitment as much as a technical one — the same commitment as "we don't push directly to `main`".
@@ -2661,16 +2670,16 @@ Because it changes what you can afford to do. If tearing down is one command, yo
 
 #### Where today sits
 
-You started with the ClickOps complaint from Session 1 and ended with the answer. You can describe infrastructure declaratively, you understand what the state file is for and what happens when it's missing, and you can create many resources from one block — knowing why `for_each` beats `count`.
+So we started with the ClickOps complaint from Session 1 and ended with the answer. You can describe infrastructure declaratively, you understand what the state file is for and what happens when it's missing, and you can create many resources from one block — knowing why `for_each` beats `count`.
 
 **ASK** <br>
 Think back to Session 3. We built a Jenkins pipeline that checked out code, ran tests, then built and pushed a Docker image — with credentials from the vault and a `post` block. What would we change to make that pipeline run **Terraform** instead? <br>
 **ANSWER** <br>
 Structurally, **almost nothing**. You'd store the four `ARM_*` values in Jenkins' credentials vault instead of a Docker Hub token. The `sh` steps would run `terraform init`, then `terraform plan -out=tfplan` in one stage, then — after a human approval gate — `terraform apply tfplan`. And **that's precisely why we saved a plan to a file this morning**: the reviewed plan is the thing that gets applied, so nothing can change between review and execution.
 
-There's exactly **one blocker**, and it's the thing Part 2 fixes: your state file is on your laptop. A Jenkins agent starts with an empty workspace, so it would believe nothing exists and try to create everything. **Remote state isn't a nice-to-have for pipeline Terraform — it's a prerequisite.**
+There's exactly **one blocker**, and it's the thing Part 2 fixes: your state file is on your laptop. A Jenkins agent starts with an empty workspace, so it would believe nothing exists and try to create everything. **Remote state isn't a nice-to-have for pipeline Terraform — it's the prerequisite.**
 
-Where this goes:
+So where do we go from here:
 - **Today** — infrastructure as declarative, version-controlled code
 - **Part 2** — real infrastructure (networks, VMs, load balancers) and **remote state** in an Azure Storage Account so a team can share it safely
 - **Kubernetes** — running and scaling containers on infrastructure Terraform provisions

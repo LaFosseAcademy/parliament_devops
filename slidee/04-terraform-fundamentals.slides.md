@@ -29,3 +29,23 @@
 <img src="./images/04-terraform-fundamentals/terraform-outputs.png">
 
 ---
+
+<img src="./images/04-terraform-fundamentals/terraform-exercise-state.png">
+
+---
+
+<img src="./images/04-terraform-fundamentals/terraform-challenge-outputs.png">
+
+---
+
+<img src="./images/04-terraform-fundamentals/terraform-variable-types.png">
+
+---
+
+<img src="./images/04-terraform-fundamentals/terraform-environments.png">
+
+---
+
+<img src="./images/04-terraform-fundamentals/terraform-exercise-variables.png">
+
+---
