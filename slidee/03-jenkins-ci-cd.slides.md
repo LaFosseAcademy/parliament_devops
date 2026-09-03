@@ -34,24 +34,24 @@
 
 ---
 
-<img src="./images/03-jenkins-ci-cd/<add>">
+<img src="./images/03-jenkins-ci-cd/jenkins-environment-block.png">
 
 ---
 
 
-<img src="./images/03-jenkins-ci-cd/<add>">
+<img src="./images/03-jenkins-ci-cd/jenkins-parameters.png">
 
 ---
 
 
-<img src="./images/03-jenkins-ci-cd/<add>">
+<img src="./images/03-jenkins-ci-cd/jenkins-post-section.png">
 
 ---
 
-<img src="./images/03-jenkins-ci-cd/<add>">
+<img src="./images/03-jenkins-ci-cd/jenkins-parallel-stages.png">
 
 ---
 
-<img src="./images/03-jenkins-ci-cd/<add>">
+<img src="./images/03-jenkins-ci-cd/jenkins-exercise-anatomy.png">
 
 ---

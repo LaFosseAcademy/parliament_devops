@@ -1393,7 +1393,7 @@ Our `Jenkinsfile` is still pasted into the Jenkins UI — the *exact same* "not 
 
 - **SCM**: `Git`
 - **Repository URL**: let's all create a repo from the `app` folder in the student facing repo.
-  - I'll call my repo: `jenkins-cdcd`
+  - I'll call my repo: `hello-pipeline-app`
   - Take the URL and add it to Jenkins config
 - **Branch Specifier**: `*/main` — the `*/` prefix means "the `main` branch from whichever remote", so it matches `origin/main`
 - **Script Path**: `Jenkinsfile` — path within the repo. The default assumes the repo root
@@ -1477,17 +1477,17 @@ if (failures > 0) {
 process.exit(0);          // ZERO = success
 ```
 
-**ASK** <br>
-Your usual test runner is Jest or Vitest. Do those do the same thing? <br>
-**ANSWER** <br>
-**Yes** — every test runner exits non-zero when tests fail. You've never needed to care, because you read the red output on your own screen. In a pipeline **nobody is reading the screen**, so that exit code is the only signal that reaches Jenkins. It's the Session 2 contract again, and it's why `npm test` works as a pipeline stage with no extra wiring.
+
+You've learnt Jest, whether the test runner is Jest, Vitest or another testing library, they do the same thing. <br>
+
+Every test runner exits non-zero when tests fail. You've never needed to care, because you read the red output on your own screen. In a pipeline **nobody is reading the screen**, so that exit code is the only signal that reaches Jenkins. It's the Session 2 contract again, and it's why the command `npm run test` works as a pipeline stage with no extra wiring.
 
 **2. Get a Docker Hub access token.**
 
 *(In your browser — [hub.docker.com](https://hub.docker.com))*
-- **Account Settings → Security → New Access Token**
+- **Account Settings → Personal Access Tokens → Generate New Token**
 - Description, permissions **Read & Write**, **Generate**
-- **Copy it now** — Docker Hub shows it once
+- **Copy the Personal Access Token now** — Docker Hub shows it once
 
 This token is what the pipeline pushes with — **never** your account password. A token can be revoked independently without changing your login.
 
@@ -1510,11 +1510,22 @@ This token is what the pipeline pushes with — **never** your account password.
 
 #### Part 2 (≈25 min) — Write the pipeline
 
-*(Run from `~/jenkins-training/<your-fork>`)*
+*(Run from `~/03-jenkins-cicd/`)*
 - Run: `touch Jenkinsfile`
 - Then: `code Jenkinsfile`
 
-Paste from Slack, replacing `your-dockerhub-username`:
+Your repo tree should look like:
+```bash
+.
+├── app
+│   ├── Dockerfile
+│   ├── index.js
+│   ├── package.json
+│   └── test.js
+└── Jenkinsfile
+```
+
+Copy, replacing `your-dockerhub-username`:
 
 ```groovy
 pipeline {
@@ -1593,9 +1604,9 @@ stage('Install & Test') {
 ```
 The top-level `agent any` sets the default, but **an individual stage can override it**. This stage runs *inside a freshly-started `node:20` container* — Jenkins pulls the image, starts it, mounts the workspace in, runs the steps, throws it away.
 
-**ASK** <br>
+
 Why bother? Jenkins could just have Node installed. <br>
-**ANSWER** <br>
+
 Because then **every project on that Jenkins shares one Node version**, and upgrading it for one team breaks another. With a per-stage Docker agent, each project declares the exact environment it needs, in its own `Jenkinsfile`, and gets a clean one every build. It's the "works on my machine" problem solved at the CI layer — the same argument that made you containerise your apps in the first place, applied one level up.
 
 **Tagging with the build number:**
@@ -1621,7 +1632,7 @@ withCredentials([usernamePassword(
 - Inside the `{ }` you can use `$DOCKER_USER` and `$DOCKER_PASS`; **outside they don't exist**
 - Jenkins **masks** these in the console log — you see `****`
 
-**ASK** <br>
+**ASK YOURSELF** <br>
 Given Jenkins masks the values anyway, why do the docs insist on **single** quotes in `sh` steps that use secrets? <br>
 **ANSWER** <br>
 Because with **double** quotes, Groovy substitutes the secret's value into the command string *before* handing it to the shell — so the literal secret can end up in a process listing, or in a stack trace if the step errors. With single quotes, Groovy passes `$DOCKER_PASS` through untouched and the **shell** resolves it from the environment, so the value never appears in the command Groovy built. Masking catches most leaks; single quotes prevent one it can't.
@@ -1634,14 +1645,13 @@ The pipe from Session 2. Rather than putting the password on the command line �
 
 Now commit and push:
 
-*(Run from `~/jenkins-training/<your-fork>`)*
+*(Run from root of repo)*
 ```bash
-git add Jenkinsfile
+git add .
 git commit -m "Add build and push pipeline"
-git push origin main
+git push 
 ```
 
-**💬 SLACK — snippet 7.** Post the whole `Jenkinsfile` here. Don't make them type it.
 
 ---
 
@@ -1652,11 +1662,12 @@ git push origin main
 2. **Pipeline** section:
    - **Definition**: `Pipeline script from SCM`
    - **SCM**: `Git`
-   - **Repository URL**: your fork's HTTPS URL
+   - **Repository URL**: your repo's HTTPS URL
    - **Branch Specifier**: `*/main`
    - **Script Path**: `Jenkinsfile`
-3. Scroll up to **Build Triggers** → tick **Poll SCM** → **Schedule**: `H/2 * * * *`
-4. **Save** → **Build Now** for the first run
+3. Scroll up to **Triggers** → tick **Poll SCM** → **Schedule**: `H/2 * * * *`
+4. **Save**
+5. **Manage Jenkins → **Available plugins** → Search: `Docker Pipeline` → Select + Install → Select 'Go back to top of page' → **Build Now** for the first run
 5. Watch the **Stage View** march through Checkout → Install & Test → Build Image → Push Image
 
 *(In your browser — [hub.docker.com](https://hub.docker.com))*
@@ -1664,18 +1675,18 @@ git push origin main
 
 **Now the moment that matters:**
 
-*(Run from `~/jenkins-training/<your-fork>`)*
+*(Run from root of repo)*
 ```bash
 echo "A trivial change" >> README.md
-git add README.md
+git add .
 git commit -m "Trigger the pipeline"
-git push origin main
+git push 
 ```
 
 Then **wait**. Within a couple of minutes Poll SCM kicks off a build **on its own**. A build you didn't start, triggered purely by a Git push. Sit with that — it's the whole point of the day.
 
-**ASK** *(mid-capstone checkpoint, ~16:15)* <br>
-Look at your stage order: Test comes *before* Build and Push. What does that ordering actually protect you from? <br>
+**ASK YOURSELF** <br>
+Click on the build drop down menu and select **'Pipeline Overview'**, look at your stage order: Test comes *before* Build and Push. What does that ordering actually protect you from? <br>
 **ANSWER** <br>
 If the tests fail, the pipeline stops there and **never builds or pushes the image**. A broken version physically cannot reach Docker Hub, because the gate caught it. Same principle as your `containerise` script checking exit codes. And there's a second reason: **the tests are the cheapest stage.** Running them first means a broken commit fails in thirty seconds rather than after a three-minute image build. Cheapest checks first is a design habit that scales all the way up.
 
@@ -1686,9 +1697,8 @@ If the tests fail, the pipeline stops there and **never builds or pushes the ima
 1. **Prove the gate works.** Add a stage *before* Build Image that deliberately fails (`sh 'exit 1'`), push it, and confirm nothing gets built or pushed. Then remove it. Worth doing — *seeing* the pipeline refuse to ship broken code is more convincing than being told it will
 2. **Break the test instead.** Edit `app/test.js` so an assertion genuinely fails, push, and watch the pipeline stop at Install & Test. This is the realistic version of stretch 1
 3. **Add a `latest` tag.** In the Push stage, also tag and push `$IMAGE_NAME:latest` alongside the numbered tag
-4. **Parallelise the checks.** Add a lint step and run it in `parallel` with the tests
-5. **Notify on failure.** Enrich the `failure` block to print the image name and the build URL, then read about the Slack/email plugins that do this for real
-6. **Webhook instead of polling** (advanced): install `ngrok`, expose your local Jenkins, set up a GitHub webhook so pushes trigger builds *instantly*
+4. **Notify on failure.** Enrich the `failure` block to print the image name and the build URL, then read about the Slack/email plugins that do this for real
+
 
 **Solution**
 
@@ -1736,36 +1746,8 @@ stage('Push Image') {
 }
 ```
 
-**Stretch 4 — parallel checks:**
 
-```groovy
-stage('Install') {
-    agent { docker { image 'node:20' } }
-    steps {
-        dir('app') { sh 'npm install' }
-    }
-}
-
-stage('Test & Lint') {
-    agent { docker { image 'node:20' } }
-    parallel {
-        stage('Unit Tests') {
-            steps { dir('app') { sh 'npm test' } }
-        }
-        stage('Lint') {
-            steps {
-                dir('app') {
-                    sh 'npm run lint || echo "no lint script configured — skipping"'
-                }
-            }
-        }
-    }
-}
-```
-
-*(The `|| echo ...` is Session 2's `||` — so a missing `lint` script doesn't fail the build while experimenting. In a real project you'd want it to fail.)*
-
-**Stretch 5 — a more useful failure message:**
+**Stretch 4 — a more useful failure message:**
 
 ```groovy
 post {
@@ -1784,24 +1766,6 @@ post {
 
 `currentBuild.currentResult` is a built-in object holding this build's outcome — `SUCCESS`, `FAILURE` or `UNSTABLE`.
 
-**Stretch 6 — ngrok webhook (outline).**
-
-*(Run from `~/jenkins-training`)*
-```bash
-ngrok http 8080
-```
-Copy the `https://....ngrok-free.app` address. Then *(on GitHub)*: **your fork → Settings → Webhooks → Add webhook**, **Payload URL** = `https://....ngrok-free.app/github-webhook/` (**the trailing slash matters**), **Content type** = `application/json`, **Just the push event**. Then *(in the Jenkins UI)*: **Configure** the job → **Build Triggers** → untick Poll SCM, tick **GitHub hook trigger for GITScm polling**. Push a commit; the build starts within a second or two.
-
-**Common capstone failures:**
-
-| Symptom | Cause |
-|---|---|
-| `docker: not found` in Build Image | Using the stock Jenkins image, not `jenkins-docker` |
-| `permission denied` on the docker socket | `-u root` omitted from the `docker run` |
-| `npm: not found` | The `agent { docker { image 'node:20' } }` block is missing or misplaced |
-| `denied: requested access to the resource is denied` | `IMAGE_NAME` doesn't start with **your** Docker Hub username |
-| Push works but nothing on Docker Hub | Look under the right account — check you're logged into the same one |
-| Poll SCM never triggers | Job was saved before the first manual build. Run **Build Now** once first |
 
 #### What to show at 16:45
 

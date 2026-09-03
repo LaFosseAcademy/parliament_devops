@@ -281,21 +281,21 @@ Full day, **09:00–17:00**, with a one-hour lunch and two 15-minute breaks.
 
 Morning. Today is the payoff for a complaint we've been making since day one.
 
-Cast your mind back to **Session 1**. We built a resource group and a storage account by hand in the Portal, and then I asked you to recreate it identically in a fresh subscription. The honest answer was "from memory, slowly, probably getting something slightly wrong." We called that **ClickOps** and listed its problems: not repeatable, no record of *why*, environments drift, no review process, and the knowledge lives in one person's head.
+Cast your mind back to **Session 1**. We built a resource group and a storage account by hand in the Portal, and then I asked you to recreate it identically in a fresh subscription. The honest answer was "from memory, slowly, probably getting something slightly wrong." We called that **ClickOps** and listed its problems: it wasn't repeatable, no record of *why*, environments drift, no review process, and the knowledge lives in one person's head.
 
-Then I asked you where you'd already solved all five of those problems, and the answer was **Git**.
+We saw that the answer to these problems was **Git**.
 
-**Session 2** started writing that knowledge down as scripts. **Session 3** had those scripts run automatically, gated by tests, on every push.
+In **Session 2** started writing that knowledge down as scripts. **Session 3** had those scripts run automatically, gated by tests, on every push.
 
-The missing piece is this: **your scripts told the computer the steps. Terraform lets you describe the result.** You don't write "create a storage account, then check whether it already exists, then maybe update it" — you write "there should be a storage account, configured like this", and Terraform works out what needs doing to make reality match.
+The missing piece is this: **your scripts told the computer the steps. Terraform lets you describe the result.** You don't write "create a storage account, then check whether it already exists, then maybe update it" — you write "there should be a storage account, configured like this", and Terraform works out what needs doing to match that description.
 
-Today you'll go from an empty folder to a configuration that provisions real Azure resources, and you'll understand the one concept that trips up nearly everyone learning Terraform: **state**.
+Today you'll go from an empty folder to a configuration that provisions real Azure resources, and you'll understand the one concept that trips up nearly everyone learning Terraform: which is **state**.
 
 **Two housekeeping things.**
 
 First, a standing rule: **anything we create, we destroy before we leave.** Cloud resources cost money.
 
-Second — **have your `my-azure-details.md` from Session 1 open.** You'll need your subscription ID, and critically your **tenant domain**, later this morning. If you didn't record it, we'll get it again in a moment, but this is why I made you write it down.
+Second — **have your `my-azure-details.md` from Session 1 open.** You'll need your subscription ID, and critically your **tenant domain**, later this morning. If you didn't record it, we'll get it again in a moment, but this is why we wrote it down.
 
 **Everyone set up now:**
 
@@ -312,6 +312,8 @@ az account show --query tenantDefaultDomain -o tsv   # YOUR tenant domain — yo
 terraform version                                    # probably fails — we install at 10:15
 ```
 
+- `tsv` is **"tab-seperated values"** removes quotes from output
+
 <br>
 <br>
 
@@ -319,19 +321,17 @@ terraform version                                    # probably fails — we ins
 
 **Terraform** is an **Infrastructure as Code** tool. Its job is to create, change and delete infrastructure — virtual machines, load balancers, storage, databases, users — based on configuration files you write and keep in Git.
 
-*REFER TO RESOURCE 1 - SLIDEE* <br>
-
-![intro-to-terraform-1](./resources/intro-to-terraform-1.png)
+- `SLIDE ACROSS`
 
 **Where it sits in the toolchain.** Terraform lives at the **Provision Server** step. It's excellent at *bringing infrastructure into existence*. It offers basic tooling for configuring what's *inside* a server, but that's not its job — installing and configuring software is the territory of **configuration management** tools like Ansible, Chef and Puppet.
 
 **ASK** <br>
-Why that split? Why not one tool that creates a VM *and* installs everything on it? <br>
+Why do you think there maybe a split? Why not one tool that creates a VM *and* installs everything on it? <br>
 **ANSWER** <br>
-Different-shaped problems on different timescales. Infrastructure changes rarely and needs careful, reviewable, all-or-nothing changes. What's installed *inside* a machine changes constantly. Keeping them separate means you can redeploy an application fifty times a day without touching the VM definition — and the two concerns can be owned, reviewed and versioned independently. It's the same instinct as separating your database schema migrations from your application code.
+Different-shaped problems on different timescales. Infrastructure changes rarely and needs careful, reviewable, all-or-nothing changes. What's installed *inside* a machine changes constantly. Keeping them separate means you can redeploy an application fifty times a day without touching the VM definition — and the two concerns can be owned, reviewed and versioned independently. It's the same instinct as separating your database schema from your application code.
 
 **ASK** <br>
-We provisioned a storage account by hand in Session 1. Why is doing it in Terraform better? <br>
+Another question to solidify the reason we use Terraform. We provisioned a storage account by hand in Session 1. Why is doing it in Terraform better? <br>
 **ANSWER** <br>
 - Removes human error — written down and reviewed, rather than re-clicked from memory
 - Fast to stand resources up in a new region or subscription — change one value, re-run
@@ -339,6 +339,8 @@ We provisioned a storage account by hand in Session 1. Why is doing it in Terraf
 - It's a text file, so you work in the editor and Git workflow you already know, with history and pull requests
 
 #### The concept everything depends on: three states
+
+- `SLIDE ACROSS`
 
 This is the most important ten minutes of the day. Terraform constantly reconciles **three** different pictures of your infrastructure.
 
@@ -350,10 +352,10 @@ This is the most important ten minutes of the day. Terraform constantly reconcil
 
 When you run `terraform apply`, Terraform reads Desired State, checks Known State to find which real Azure resources it's responsible for, refreshes against Actual State, works out the difference, and makes the minimum changes needed.
 
-**ASK** <br>
+
 That third one seems redundant. If Terraform can just go and *look* at what's really in Azure, why remember what it did last time? <br>
-**ANSWER** <br>
-Three reasons, and we'll see all three today. **(1) Mapping** — your config calls something `my_storage_account`, but Azure calls it a long resource ID. The state file is the **lookup table** joining those two names; without it Terraform has no idea which Azure resource your block refers to, so it assumes it must create a new one. **(2) Metadata and dependencies** — it records the order things were created in, so it can destroy them in the right order. **(3) Performance** — asking Azure about every resource on every run is slow. State acts as a cache.
+
+Three reasons, and we'll see all three today. **(1) Mapping** — your config calls something `my_storage_account`, a name we provide for a resource, but Azure calls it a long resource ID. The state file is the **lookup table** joining those two names; without it Terraform has no idea which Azure resource your block refers to, so it assumes it must create a new one. **(2) Metadata and dependencies** — it records the order things were created in, so it can destroy them in the right order. Then we have **(3) Performance** — asking Azure about every resource on every run is slow. State acts as a cache.
 
 Hold onto that. We'll break it deliberately later this morning and watch what happens.
 
@@ -363,22 +365,19 @@ One more framing. Your bash scripts in Session 2 were **imperative** — a list 
 
 The practical difference: tell Terraform "I want 3 users" when 2 exist, and it creates **one**. You never wrote "add one more". You stated the desired total, and Terraform did the subtraction.
 
-**ASK** <br>
-Where have you written declarative code before, without necessarily calling it that? <br>
-**ANSWER** <br>
-Several places. **React** — you describe what the UI should look like for a given state, and React diffs it against the DOM and patches the difference. You don't write "remove this div, then add that one". **SQL** — `SELECT * FROM users WHERE active = true` describes the result you want, not how to traverse the index. **Your Dockerfile**, largely. Terraform is that same idea applied to cloud infrastructure — and if the React analogy lands, you already understand the mental model. The `plan` command is Terraform showing you its diff before it patches.
 
-**ASK** <br>
-Terraform is not the only IaC tool. What else exists in this space? <br>
-**ANSWER** <br>
-Plenty, and it's worth knowing the landscape:
+
+
+Terraform is not the only IaC tool.<br>
+
+We also have <br>
 - **ARM templates** — Azure's original, JSON-based and famously verbose
-- **Bicep** — Microsoft's much nicer DSL that compiles to ARM. Azure-only, but excellent if you're Azure-only
+- **Bicep** — Microsoft's much nicer DSL (which is Domain Specific Language) that compiles to ARM. Azure-only, but excellent if you're Azure-only
 - **AWS CloudFormation** — the AWS equivalent
 - **Pulumi** — same idea, but you write it in real TypeScript/Python/Go rather than a DSL
 - **Ansible** — primarily configuration management, but can provision too
 
-Terraform's advantage is that it's **cloud-agnostic** and has by far the widest provider ecosystem — the same tool and the same mental model for Azure, AWS, GCP, GitHub, Cloudflare and Datadog. That's why it's the most transferable one to learn. **You'll research two of these properly as a take-home.**
+Terraform's advantage is that it's **cloud-agnostic** and has by far the widest provider ecosystem — the same tool and the same mental model for Azure, AWS, GCP, GitHub, Cloudflare and Datadog. That's why it's the most transferable one to learn.
 
 <br>
 <br>
@@ -387,6 +386,7 @@ Terraform's advantage is that it's **cloud-agnostic** and has by far the widest 
 
 <br>
 <br>
+
 ### 10:15–11:15 — Setup: Install, Service Principal, Credentials, `init`
 *(Activity: 30 min)*
 
@@ -435,13 +435,12 @@ Now create it:
 az ad sp create-for-rbac --name "terraform-training-sp" --role="Contributor" --scopes="/subscriptions/<your-subscription-id>"
 ```
 
-Mostly revision:
+To break down that command again:
 - `az ad sp` — Azure AD, Service Principal
 - `create-for-rbac` — create it *and* assign a role in one go
 - `--role="Contributor"` — can create, change and delete resources, but **cannot grant permissions to others**. Exactly what Terraform needs
 - `--scopes` — where that role applies. Here, the whole subscription
 
-![intro-to-terraform-2](./resources/intro-to-terraform-2.png)
 
 It returns JSON. Three fields matter:
 
@@ -458,16 +457,28 @@ In Session 1 you gave a Service Principal `Reader`. Today it's `Contributor`. Wh
 **ANSWER** <br>
 `Reader` can only look — Terraform must **create and delete** things, so it needs `Contributor`. But it deliberately stops short of `Owner`, because Owner can **grant permissions to other identities**. A compromised `Contributor` credential can wreck your resources; a compromised `Owner` credential can quietly give an attacker permanent access to everything and then cover its tracks. That's the least-privilege principle from Session 1, applied to a real decision: **pick the weakest role that still does the job.**
 
-**NOTE FOR TRAINERS** <br>
-Also flag the scope shortcut honestly: subscription-wide `Contributor` is pragmatic for training but too broad for production, where you'd scope to specific resource groups. Students who go on to do this at work should know we took a shortcut. <br>
-**END OF NOTE**
 
 #### Step 3 — Expose the credentials as environment variables
 
-The `azurerm` provider *can* read credentials directly from a `provider` block in your `.tf` file — and HashiCorp's docs explicitly warn you not to.
+It's no good have Terraform configuration without Azure knowing which acount to created resources for. So we need to provide a way to tell Terraform, I want these resources but for this specific account. 
 
-![intro-to-terraform-5](./resources/intro-to-terraform-5.png)
-![intro-to-terraform-6](./resources/intro-to-terraform-6.png)
+The `azurerm` "Azure Resource Mananger" provider *can* read credentials directly from a `provider` block in your `.tf` file — and HashiCorp's docs explicitly warn you not to.
+
+Let's look at some genuine HCL (HashiCorp Controller Language)
+
+- *Scroll down to third warning*
+
+[Credentials Directly Inserted](https://registry.terraform.io/providers/Azure/azapi/latest/docs/guides/service_principal_client_secret)
+
+
+The first thing to say is we write HTML into a **.html** file, JavaScript into a **.js** file and our Terraform configuration into a **.tf** file. 
+
+Where **index.js** is the normal entry point for JavaScript. **Main.tf** is the equivalent for Terraform. 
+
+From the configuration we can see, inside the different curly braces we can provide a lot of base configuration. 
+- Which cloud service provider
+- Which version
+- Also our credentials 
 
 **ASK** <br>
 Why is hard-coding those four values into `main.tf` genuinely dangerous, rather than just untidy? <br>
@@ -476,11 +487,13 @@ Because `main.tf` goes into Git, and **Git history is permanent** — deleting t
 
 So we use **environment variables**. The provider looks for four specific names automatically.
 
-**NOTE FOR STUDENTS** <br>
-Run these in **VS Code's integrated terminal**, and run Terraform from that same terminal. Environment variables set in one terminal don't exist in another — this catches people out constantly. <br>
-**END OF NOTE**
 
-*REFER TO RESOURCE 2 - SLIDEE* <br>
+Run these commands in **VS Code's integrated terminal**,open up the `./terraform-training` folder in VSCode, open a terminal there and run Terraform from that same terminal. Environment variables set in one terminal don't exist in another<br>
+
+
+- `SLIDE ACROSS`
+
+So run these commands from your Terminal in VSCode, subbing in the placeholders with the information you saved earlier. 
 
 *(Run from `~/terraform-training`, in VS Code's terminal — Mac/Linux)*
 ```bash
@@ -492,12 +505,10 @@ export ARM_TENANT_ID=<tenant>
 
 **Note the single quotes around the secret.** Client secrets frequently contain `~`, `!` or `$`, which bash would otherwise interpret — that's the quoting lesson from Session 2, biting for real.
 
-*(Windows — `set` for this session, `setx` to persist)*
-```bash
-set ARM_CLIENT_ID=<appId>
-```
 
 To make them permanent on Mac/Linux, add those four lines to `~/.zshrc` or `~/.bashrc` — the file that runs every time a shell opens. Same trick you used to put `~/bin` on your `PATH`.
+
+- `SLIDE ACROSS`
 
 **.zshrc**
 ```
@@ -507,24 +518,13 @@ export ARM_SUBSCRIPTION_ID="7c3a9e21-1b4d-4f6a-9c8e-2d5f7a1b3c6e"
 export ARM_TENANT_ID="9f4b1c2a-3d5e-4a6b-8c7d-1e2f3a4b5c6d"
 ```
 
-Managing environment variables, for reference:
-
-**Mac / Linux**
-- `export` on its own — list every environment variable
-- `export NAME=value` — set one
-- `unset NAME` — delete one
-
-**Windows**
-- `printenv` (Git Bash) or `set` — list them
-- `setx NAME value` — set persistently
-- `setx NAME ""` — clear one
 
 #### Step 4 — Create a project and initialise it
 
-Terraform uses configuration files ending in **`.tf`**.
+Terraform uses configuration files ending in **`.tf` as we said**.
 
 *(Run from `~/terraform-training`)*
-- Run: `cp <starter-repo>/.gitignore .` — **do this before anything else**
+- Run: `touch .gitignore` and copy the **.gitignore** from the resources folder int he student facing repo into it
 - Run: `mkdir 01-terraform-basics` → **cd inside**
 
 *(Run from `~/terraform-training/01-terraform-basics`)*
@@ -564,10 +564,7 @@ Your first HCL, and every line does something:
 - `provider "azurerm" { }` — configuration *for* that provider once downloaded
 - `features {}` — an Azure-provider quirk: mandatory, and usually empty. It exists so Azure can add opt-in behaviours later
 
-**ASK** <br>
-`~> 3.0` means "3.x but not 4.0". What's that the same as in a `package.json`? <br>
-**ANSWER** <br>
-`^3.0.0` — caret ranges. Identical reasoning: take bug fixes and minor features automatically, but never a major version, because major versions are allowed to break your syntax. You've been managing dependency versions for years; this is that, for cloud plugins.
+
 
 **Take a look at what else exists.** Open the [Terraform Registry](https://registry.terraform.io/browse/providers). Terraform isn't an Azure tool — it's a *provisioning* tool with hundreds of providers. Bookmark it; it's the documentation you'll live in.
 
@@ -587,18 +584,20 @@ Two new things appeared:
 *(Run from `~/terraform-training/01-terraform-basics`)*
 ```bash
 ls -la
-du -sh .terraform
+du -sh .terraform # Shows Disk space it's using
 ```
 
-- **`.terraform/`** — a hidden folder holding the downloaded provider binary. Run that `du -sh` and notice it's **hundreds of megabytes**. Every Terraform project you init downloads its own copy
+- **`.terraform/`** — a hidden folder holding the downloaded provider binary. When I ran `du -sh`, notice it's **hundreds of megabytes**. Every Terraform project you init downloads its own copy
 - **`.terraform.lock.hcl`** — the dependency lock file
 
 **ASK** <br>
 A hidden folder of hundreds of MB of downloaded dependencies, plus a lock file pinning exact versions. What does this remind you of? <br>
 **ANSWER** <br>
-**`node_modules` and `package-lock.json`** — and the parallel is essentially exact. `.terraform/` is `node_modules`: downloadable, disposable, gitignored, and enormous. `.terraform.lock.hcl` is `package-lock.json`: it pins the exact resolved versions so every developer and every CI run gets the same thing, and **it should be committed**. That's why our `.gitignore` excludes `.terraform/` but not the lock file.
+**`node_modules` and `package-lock.json`** — and the parallel is essentially exact. `.terraform/` is `node_modules`: downloadable, disposable, gitignored, and enormous. `.terraform.lock.hcl` is `package-lock.json`: it pins the exact resolved versions so every developer and every CI pipeline run gets the same thing, and **it should be committed**. That's why our `.gitignore` excludes `.terraform/` but not the lock file.
 
 **HANDS ON (30 min)** <br>
+
+I want you to follow these steps yourself or make notes so you can repeat the process yourself independantly. 
 
 Part A *(15 min)* — install and authenticate.
 1. Install Terraform, confirm `terraform --version`, and run `which terraform`
@@ -743,6 +742,7 @@ du -sh .terraform        # typically 300-700 MB
 
 <br>
 <br>
+
 ### 11:15–12:15 — Your First Resources: Resource Group & Storage Account
 *(Activity: 25 min)*
 
@@ -783,6 +783,8 @@ resource "azurerm_resource_group" "my_resource_group" {
 
 **The resource block syntax — learn this shape; everything else today is a variation:**
 
+- `SLIDE ACROSS`
+
 ```tf
 resource "<provider>_<resource_type>" "<internal_name>" {
   <attribute> = <value>
@@ -805,8 +807,9 @@ So we have two names. What's the difference between `"my_resource_group"` and `n
 #### Creating a Storage Account
 
 **ASK** <br>
-What's Azure's equivalent of an S3 bucket? <br>
+What's Azure's equivalent of an S3 bucket? No don't expect you to know what an S3 Bucket is but these are common terms in DevOps so give both a Google or use AI.<br>
 **ANSWER** <br>
+They're object storage, a bit similar to DropBox. <br>
 Azure splits it into two: a **Storage Account**, the top-level container, and a **Blob Container** inside it, where the actual files (blobs) live.
 
 Let's create one in the Portal first, just to see what we're automating.
@@ -815,13 +818,14 @@ Let's create one in the Portal first, just to see what we're automating.
 - **Create a resource → Storage account**
 - Try the name `storage` — you'll be told it already exists
 
-Storage account names must be **globally unique across all of Azure**, and are more restrictive than S3: **lowercase letters and numbers only**, no hyphens, no underscores, 3–24 characters.
+Storage account names must be **globally unique across all of Azure**, additionally they must be **lowercase letters and numbers only**, no hyphens, no underscores, 3–24 characters.
 
-- Use something like `stemilesherrottdevops`, leave the rest default, **Review + create** → **Create**
+- Use something like `stemilesherrottdevops`
+- Choose Primary Service: `Azure Blob Storage or Azure Data Lake Storage` leave the rest default, **Review + create** → **Create**
 
-![intro-to-terraform-9](./resources/intro-to-terraform-9.png)
 
-Click into it, then **Containers** — that's where files would go. Now let's do the same thing properly, in code.
+Click into it, then **Data storage -> Containers** — that's where files would go. If we were Netflix, we could upload a season of Squid Games or whatever and then our App could pull the files from there. <br>
+Now let's do the same thing properly, in code.
 
 *(Run from `~/terraform-training/01-terraform-basics`)* — add to `main.tf`:
 
@@ -855,14 +859,10 @@ That's a **reference**. Instead of typing `"rg-emilesherrott-devops"` again, we 
 Note there are **no quotes** — quotes would make it a literal string. This is an expression, so it's bare.
 
 **ASK** <br>
-Why is referencing better than typing the name string again? <br>
+Why is referencing better than typing the name string? <br>
 **ANSWER** <br>
 Two reasons. **(1) Single source of truth** — rename the resource group in one place and everything following it updates. **(2) Dependency ordering**, which is the big one. By referencing it you've told Terraform "this storage account **depends on** that resource group", so Terraform builds a dependency graph and creates the resource group **first**. You never specify the order.
 
-**ASK** <br>
-Where have you relied on a tool doing exactly that dependency resolution for you? <br>
-**ANSWER** <br>
-**`npm install`.** You list dependencies; npm works out the order and what depends on what. You've never written "install lodash before express". Terraform does the same for cloud resources — and critically, it also works out the **reverse order for destruction**, so it won't delete a resource group while something inside it still exists. Break the reference and hard-code the string, and you lose all of that: Terraform might try to create the storage account before its container exists.
 
 Remaining attributes: `account_tier = "Standard"` (versus Premium, SSD-backed and pricier), and `account_replication_type = "LRS"` — **L**ocally **R**edundant **S**torage, three copies within one datacentre. Cheapest, fine for training. `GRS` replicates to the paired region — the disaster-recovery idea from Session 1.
 
@@ -875,18 +875,11 @@ Terraform has a sensible workflow: **check what would happen, then do it.**
 terraform plan
 ```
 
-![intro-to-terraform-10](./resources/intro-to-terraform-10.png)
-
 `plan` compares Desired against Known (refreshing against Actual) and tells you exactly what it *would* do, without doing anything. Read the output together:
 
 - `+` create, `-` destroy, `~` update in place
 - Lots of attributes show `(known after apply)` — `primary_access_key`, `primary_blob_endpoint`, `id`. Terraform can't know those until Azure has made the thing
 - The only values it *can* show are the ones you wrote
-
-**ASK** <br>
-What's `terraform plan` the equivalent of, in a workflow you use daily? <br>
-**ANSWER** <br>
-**A pull request diff**, or `git diff`. It's "here is exactly what will change, review it before it happens". And in Session 8 that parallel becomes literal: the pipeline runs `plan`, a human reviews the output on the PR, and only then does `apply` run. The habit of *reading the plan* is the same habit as reading a diff before approving.
 
 Now execute:
 
@@ -895,24 +888,22 @@ Now execute:
 terraform apply
 ```
 
-![intro-to-terraform-11](./resources/intro-to-terraform-11.png)
 
 `apply` shows the plan again, then stops and asks for confirmation. At the bottom: **Plan: 2 to add, 0 to change, 0 to destroy**. The only input it accepts is the literal word `yes`.
 
 - Type: `yes`
-
-![intro-to-terraform-12](./resources/intro-to-terraform-12.png)
 
 If that worked, your credentials are correct and Terraform has real access to your subscription.
 
 *(In the Azure Portal — Resource groups)*
 - Open **rg-emilesherrott-devops** and refresh. Your storage account is there
 
-![intro-to-terraform-13](./resources/intro-to-terraform-13.png)
 
 **NOTE FOR TRAINERS** <br>
 Failures here are almost always one of two things: **credentials** (an `ARM_*` variable missing, or set in a different terminal) or a **non-unique storage account name**. Have students check `export | grep ARM` first, then try a more obscure name. <br>
 **END OF NOTE**
+
+- `SLIDE ACROSS`
 
 **HANDS ON (25 min)** <br>
 *(Run from `~/terraform-training/01-terraform-basics`)*
@@ -1017,7 +1008,6 @@ resource "azurerm_storage_account" "my_storage_account" {
 terraform apply
 ```
 
-![intro-to-terraform-15](./resources/intro-to-terraform-15.png)
 
 Read the output carefully: **destroy and then create replacement**, and **`must be replaced`**. Summary: **1 to add, 0 to change, 1 to destroy**.
 
@@ -1030,9 +1020,20 @@ Why does it matter that Terraform knows *which* attributes force a replacement r
 **ANSWER** <br>
 Because a replacement is **destructive**. On a storage account holding real data, or a database, "destroy and recreate" is potentially catastrophic — and the plan output is your only warning before it happens. This is a very strong argument for always running `plan` and actually **reading** it, especially in production. It's the same reason you read a migration before running it against a live database.
 
+We can see this in the documentation as well. 
+
+[Documentation](https://registry.terraform.io/providers/hashicorp/azurerm/1.43.0/docs/resources/storage_account)
+
+If we scroll down we can see the **Argument Reference** and under **name** it has the text:
+- `Required`, so we need to have that key value present
+- Also *"Changing this forces a new resource to be created"* <br>
+Which is what we've just experienced. 
+
 #### Enabling versioning — a property, not a resource
 
 *(In the Azure Portal — your storage account)* — look at **Data protection** under **Data management**. **Blob versioning** is disabled.
+
+I'm showing you this purely to demo how terraform syntax is constructed but it may be something we want to enable if we want to retain older versions of the files we save. 
 
 **main.tf**
 ```tf
@@ -1046,9 +1047,13 @@ resource "azurerm_storage_account" "my_storage_account" {
 }
 ```
 
-Notice `blob_properties { }` has **no `=`**. That's a **nested block**, not an attribute:
+Notice `blob_properties { }` has **no `=`**. It's a **nested block**, not an attribute:
 - `name = "value"` — an **attribute**: a single named value, uses `=`
 - `blob_properties { ... }` — a **block**: a group of related settings, no `=`, uses braces
+
+Using the documentation, can you tell me whether this will force a new resource or can we change the existing one. 
+
+- *Share*: https://registry.terraform.io/providers/hashicorp/azurerm/1.43.0/docs/resources/storage_account
 
 *(Run from `~/terraform-training/01-terraform-basics`)*
 ```bash
@@ -1071,13 +1076,12 @@ Occasionally `terraform.tfstate` lags behind a configuration-only change. If Kno
 terraform console
 ```
 
-An interactive REPL for querying your configuration and state — like `node` in a terminal, but for Terraform expressions.
+An interactive **REPL** which stands for **"Read-Evaluate-Print Loop"**, basically for querying your configuration and state — like if we run `node` in a terminal, but for Terraform expressions.
 
 ```
 azurerm_storage_account.my_storage_account
 ```
 
-![intro-to-terraform-16](./resources/intro-to-terraform-16.png)
 
 Every attribute of the storage account. The syntax is a **reference**, same as the one linking your two resources:
 
@@ -1087,18 +1091,23 @@ Every attribute of the storage account. The syntax is a **reference**, same as t
 
 Critically, you use the **internal name** (`my_storage_account`), *not* the Azure name. **Terraform doesn't think in Azure names.**
 
+This looks very similar to digging into a JavaScript object. 
+
 Dig deeper:
 ```
 azurerm_storage_account.my_storage_account.blob_properties
 ```
-![intro-to-terraform-17](./resources/intro-to-terraform-17.png)
+
 
 It comes back wrapped in `[ ]` — it's a **list**. Nested blocks can appear multiple times, so the provider models them as a list even when there's one. Index into it, exactly like a JavaScript array:
 
+**ASK**<br>
+How would we do that if it were an array? <br>
+**ANSWER** <br>
 ```
 azurerm_storage_account.my_storage_account.blob_properties[0]
 ```
-![intro-to-terraform-18](./resources/intro-to-terraform-18.png)
+
 
 **ASK** <br>
 How would we get just the value of `versioning_enabled`? <br>
@@ -1110,6 +1119,8 @@ Exit with `Ctrl + C` (or `exit`).
 #### Outputs
 
 The console is great for exploring. For a value you want *every time*, define an **output**.
+
+- `SLIDE ACROSS`
 
 ```tf
 output "<output-name>" {
@@ -1130,7 +1141,6 @@ output "my_storage_account_versioning" {
 terraform apply -refresh=false
 ```
 
-![intro-to-terraform-19](./resources/intro-to-terraform-19.png)
 
 `-refresh=false` says **don't ask Azure what's really there** — just compare Desired against Known. We know they match and we only added an output, so skipping the refresh makes it fast.
 
@@ -1143,13 +1153,16 @@ You're not limited to one:
 # NEW CODE
 output "my_storage_account_complete_details" {
   value = azurerm_storage_account.my_storage_account
+  sensitive = true
 }
 ```
 
+We add the attribute `sensitive` because it may reveal sensitive information and we're letting terraform now we're comfortable with that. 
+
 **ASK** <br>
-Outputs are handy for poking around. What are they actually *for* in a real project? <br>
+Outputs are handy for poking around. What do you think they're actually *for* in a real project? <br>
 **ANSWER** <br>
-Three things. **Passing information onward** — a blob endpoint or DNS name handed to another part of your infrastructure, or another Terraform project. **Debugging** — surfacing key facts to confirm things provisioned correctly. And the big one: **integration with external systems.** A pipeline stage can read `terraform output` and use those values — which is exactly how Session 8 connects "Terraform built a Kubernetes cluster" to "now deploy to it". Think of outputs as a module's **return values**, or the `exports` of a file: the deliberately chosen public interface.
+Three things. **Passing information onward** — a blob endpoint or DNS name handed to another part of your infrastructure, or another Terraform project. **Debugging** — surfacing key facts to confirm things provisioned correctly. And the big one: **integration with external systems.** A pipeline stage can read `terraform output` and use those values.
 
 #### Adding an Azure AD user
 
@@ -1196,25 +1209,54 @@ provider "azuread" {}
 
 # NEW CODE — REPLACE THE DOMAIN WITH YOUR OWN
 resource "azuread_user" "my_azuread_user" {
-  user_principal_name = "my_iam_user_abc@emilesherrottdevops.onmicrosoft.com"
+  user_principal_name = "my_iam_user_abc@emilesherrottgmail.onmicrosoft.com"
   display_name        = "my_iam_user_abc"
   mail_nickname       = "my_iam_user_abc"
   password            = "ChangeMe123!ChangeMe"
 }
 ```
 
+You can see domains which are available on your account with:
+
+```bash
+az rest --method get \
+  --url "https://graph.microsoft.com/v1.0/domains" \
+  --query "value[].id" \
+  -o tsv
+```
+
+So this could be a process if someone is joining your organisation and you need to set them up with an account.
+
+# ADD
+
+**ASK**<br>
+How are we authenticating ourselves in Terraform to provision these resources? <br>
+**ANSWER**<br>
+A Service Principal we created linked to our Tenant and Subscription
+
+Our Service Principle at the moment has permissions as a Contributor within the AzureRM provider. We've added another privoder however the AzureAD provider which doesn't manage resources per-se but EntraID. 
+
+Before we're able to execute our current configuration we'll need to add some new privilages. 
+
+- In the Azure Portal go to: **EntraID -> App registrations -> All applications** and you should see the one we created earlier. Click into it
+
+- Then go to **Manange -> API permissions -> Click 'Add a permission' -> select Microsoft Graph -> Select Application permissions -> Search for 'User.ReadWrite.All' -> Tick -> Click Add permissions**
+
+Then on the same page we should be able to click: **"Grant admin consent for Default Directory"**
+
+
 Note this is the **`azuread`** provider, separate from `azurerm`. Azure splits identity (Entra ID) from resource management, and Terraform mirrors that with two providers.
 
-Because you added a provider, re-initialise:
+Because you added a provider, we also need to re-initialise:
 
 *(Run from `~/terraform-training/01-terraform-basics`)*
 ```bash
 terraform init
 ```
 
-**NOTE FOR TRAINERS** <br>
-Azure AD enforces password complexity (upper and lowercase, numbers, symbols, min 8 characters). If `apply` rejects it, tweak until it passes — and use the moment to say that in a real project you'd generate this with the `random_password` resource rather than hard-coding it in a file destined for Git. That's a take-home stretch. <br>
-**END OF NOTE**
+
+Azure AD enforces password complexity (upper and lowercase, numbers, symbols, min 8 characters). If `apply` rejects it, tweak until it passes. In a real project you'd generate this with the `random_password` resource rather than hard-coding it in a file destined for Git. 
+
 
 #### Saving a plan to a file
 
@@ -1223,7 +1265,6 @@ Azure AD enforces password complexity (upper and lowercase, numbers, symbols, mi
 terraform plan -out aduser.tfplan
 ```
 
-![intro-to-terraform-20](./resources/intro-to-terraform-20.png)
 
 `-out <file>` saves the plan. Try opening `aduser.tfplan` in your editor — it's **binary**, not readable text.
 
@@ -1232,14 +1273,14 @@ terraform plan -out aduser.tfplan
 terraform apply "aduser.tfplan"
 ```
 
-![intro-to-terraform-21](./resources/intro-to-terraform-21.png)
+
 
 Notice: **no `yes` prompt.** It just runs.
 
 **ASK** <br>
 Applying a saved plan skips the confirmation. Feature or hazard? <br>
 **ANSWER** <br>
-Both, depending entirely on context. It's a **feature** in a pipeline — and this is precisely how Session 8 works: run `plan` in one stage, a human reviews the output, then `apply` **that exact saved plan**, guaranteeing nothing changed between review and execution. It's a **hazard** if you saved a plan an hour ago and the world has moved on, because it won't re-check. The safety of a saved plan comes entirely from it being **fresh and reviewed**.
+Both, depending entirely on context. It's a **feature** in a pipeline — and this is a good place to get to: run `plan` in one stage, a human reviews the output, then `apply` **that exact saved plan**, guaranteeing nothing changed between review and execution. It's a **hazard** if you saved a plan an hour ago and the world has moved on, because it won't re-check. The safety of a saved plan comes entirely from it being **fresh and reviewed**.
 
 #### Updating in place, with a target
 
@@ -1249,7 +1290,6 @@ Both, depending entirely on context. It's a **feature** in a pipeline — and th
 terraform apply -target=azuread_user.my_azuread_user
 ```
 
-![intro-to-terraform-23](./resources/intro-to-terraform-23.png)
 
 - Type: `yes`
 
@@ -1262,7 +1302,6 @@ terraform apply -target=azuread_user.my_azuread_user
 ls -la
 ```
 
-![intro-to-terraform-24](./resources/intro-to-terraform-24.png)
 
 Two files:
 - **`terraform.tfstate`** — the current Known State
@@ -1270,7 +1309,7 @@ Two files:
 
 Open `terraform.tfstate`. Two top-level keys matter: **`outputs`** (your defined outputs) and **`resources`** (everything Terraform manages — type, internal name, current attributes, metadata).
 
-Compare the two files: `terraform.tfstate` has the AD user as `def`; the backup still says `abc`. Every successful `apply` moves the old state into `.backup`.
+If we compare the two files: `terraform.tfstate` has the AD user as `def`; the backup still says `abc`. Every successful `apply` moves the old state into `.backup`.
 
 **You should never edit these by hand.** So naturally, let's break one on purpose.
 
@@ -1320,7 +1359,7 @@ Sanity restored.
         "attributes": {
           # HERE — Azure's identifier for the real object
           "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-          "user_principal_name": "my_iam_user_def@emilesherrottdevops.onmicrosoft.com",
+          "user_principal_name": "my_iam_user_def@emilesherrottgmail.onmicrosoft.com",
           "display_name": "my_iam_user_def"
         }
       }
@@ -1329,7 +1368,7 @@ Sanity restored.
 [ . . . ]
 ```
 
-Terraform finds the resource by its **`name`** (your internal name), then reads the **`id`** to know which real Azure object it maps to. **That's the join.** Without it, `my_azuread_user` means nothing — no way to connect your config block to that GUID, or even to know Terraform created it.
+Terraform finds the resource by its **`name`** (your internal name), then reads the **`id`** to know which real Azure object it maps to. **That's the join.** Without it, `my_azuread_user` means nothing — no way to connect your config block to that GUID (Globally Unique Identifier), or even to know Terraform created it.
 
 This is also why the Azure AD users you clicked into existence in Session 1 are invisible to Terraform: they were never in the state file.
 
