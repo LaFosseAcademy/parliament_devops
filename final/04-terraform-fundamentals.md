@@ -1589,14 +1589,13 @@ output "my_azuread_user_complete_details" {
 terraform plan -refresh=false
 ```
 
-![intro-to-terraform-25](./resources/intro-to-terraform-25.png)
 
 **No changes.** Exactly right — you moved text between files, you didn't change what you're asking for.
 
 **The rule: Terraform reads *every* `.tf` file in the current directory and concatenates them.** File names are purely for humans. `main.tf`, `outputs.tf`, `banana.tf` — Terraform doesn't care, as long as the extension is `.tf`.
 
 Two things follow, and both catch beginners:
-- It reads the **current directory only**. It does **not** recurse into subfolders. That's why each numbered folder today is a completely separate project with its own state
+- It reads the **current directory only**. It does **not** go into subfolders. That's why each folder we work in today is a completely separate project with its own state
 - Because everything is concatenated, **order doesn't matter** — you can reference a resource defined in another file, or further down the same file
 
 **ASK** <br>
@@ -1618,7 +1617,7 @@ The conventional layout you'll see in real projects: `main.tf` (providers and ba
 **ASK** <br>
 We've established the state file is important and the team needs it. So we should commit `terraform.tfstate` to GitHub… shouldn't we? <br>
 **ANSWER** <br>
-**No.** State files store attribute values **unencrypted** — including secrets. Your AD user's password is sitting in that file in plain text right now. **Go and look.** Committing it, especially to a public repo, hands those secrets to anyone who can read it.
+**No.** State files store attribute values **unencrypted** — including secrets. Your AD user's password is sitting in that file in plain text right now. Committing it, especially to a public repo, hands those secrets to anyone who can read it.
 
 Have them actually check:
 
