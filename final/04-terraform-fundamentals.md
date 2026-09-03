@@ -1245,9 +1245,7 @@ Before we're able to execute our current configuration we'll need to add some ne
 Then on the same page we should be able to click: **"Grant admin consent for Default Directory"**
 
 
-Note this is the **`azuread`** provider, separate from `azurerm`. Azure splits identity (Entra ID) from resource management, and Terraform mirrors that with two providers.
-
-Because you added a provider, we also need to re-initialise:
+Also because we added a new provider, we also need to re-initialise:
 
 *(Run from `~/terraform-training/01-terraform-basics`)*
 ```bash
@@ -1370,12 +1368,8 @@ Sanity restored.
 
 Terraform finds the resource by its **`name`** (your internal name), then reads the **`id`** to know which real Azure object it maps to. **That's the join.** Without it, `my_azuread_user` means nothing — no way to connect your config block to that GUID (Globally Unique Identifier), or even to know Terraform created it.
 
-This is also why the Azure AD users you clicked into existence in Session 1 are invisible to Terraform: they were never in the state file.
 
-**ASK** <br>
-So state is a mapping table between your names and Azure's IDs. What does that make `terraform.tfstate`, in database terms? <br>
-**ANSWER** <br>
-A **join table** — or an ORM's identity map. And the same rules apply: if it's lost, the relationships are lost even though both sides still exist. If two people edit it simultaneously, it corrupts. **Which is exactly why Part 2 moves it off your laptop into shared, locked storage** — the problems you'd anticipate with a shared database file are precisely the problems remote state solves.
+- `SLIDE ACROSS`
 
 **HANDS ON (20 min)** <br>
 *(Run from `~/terraform-training/01-terraform-basics`)*
@@ -1481,12 +1475,14 @@ terraform plan          # -> "No changes"
 
 **Challenge**
 
+- `SLIDE ACROSS`
+
 *Direct* students, **in pairs**, to extend their configuration so that:
 
 * A **second** storage account is created in the same resource group, with a different name
 * It uses `account_replication_type = "GRS"` instead of `LRS`
 * Both storage accounts **reference** the resource group rather than hard-coding its name
-* An **output** called `all_blob_endpoints` returns a **list** containing the `primary_blob_endpoint` of *both*
+* An **output** called `all_blob_endpoints` returns a **list** containing the `primary_blob_endpoint` of *both* (see `terraform.tfstate` to see the keys)
 * **OPTIONAL** — a second output returning only the **first** endpoint from that list
 
 *Provide* this example output shape as an aid:
@@ -1558,6 +1554,7 @@ Three points to draw out when revealing:
 
 <br>
 <br>
+
 ### 14:00–14:45 — Refactoring, `.gitignore`, and Variables
 *(Activity: 20 min)*
 
