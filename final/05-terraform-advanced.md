@@ -440,7 +440,7 @@ The cost is per month but I'm going to choose: B2als_v2
 ```md
 Location - swedencentral
 Marketplace Image (urn) - Canonical:ubuntu-24_04-lts:server:latest
-VM size - B2als_v2
+VM size - Standard_B2als_v2
 ```
 
 
@@ -476,7 +476,7 @@ So we'll create **1** VNet and **3** subnets, one per availability zone.
 ```md
 Location - swedencentral
 Marketplace Image (urn) - Canonical:ubuntu-24_04-lts:server:latest
-VM size - B2als_v2
+VM size - Standard_B2als_v2
 VNet - vnet-emilesherrott-devops
 ```
 
@@ -1087,7 +1087,7 @@ resource "azurerm_linux_virtual_machine" "http_server" {
   name                  = "http-server"
   resource_group_name   = azurerm_resource_group.vm_resource_group.name
   location              = azurerm_resource_group.vm_resource_group.location
-  size                  = "B2als_v2"
+  size                  = "Standard_B2als_v2"
   admin_username        = "azureuser"
   network_interface_ids = [azurerm_network_interface.http_server_nic.id]
 
@@ -1116,9 +1116,9 @@ variable "azure_ssh_public_key" {
 
 Working through it:
 
-**`size = "Standard_B1s"`** — the hardware, straight from `config.md`.
+**`size = "Standard_B2als_v2"`** — the hardware, straight from `config.md`.
 
-**`admin_username = "azureuser"`** — **we choose this ourselves.** Worth flagging: in AWS the login (`ec2-user`, `ubuntu`) is baked into the AMI and you have to know it. In Azure you pick it, so there's nothing to look up.
+**`admin_username = "azureuser"`** — **we choose this ourselves.** 
 
 **`network_interface_ids = [ ... ]`** — note the **square brackets**: a VM can have multiple NICs, so this is a list even with one.
 
@@ -1127,7 +1127,7 @@ Working through it:
 **ASK** <br>
 `file()` reads from your local disk at apply time. What does that imply for running this in a pipeline later? <br>
 **ANSWER** <br>
-That **the file has to exist on whatever machine runs Terraform.** Your laptop has it; a Jenkins agent starting from a fresh container does not. So a pipeline would need the key injected as a credential, or — better — you'd avoid `file()` for secrets entirely and pass the public key as a variable. It's a small thing that quietly breaks the transition from "works on my machine" to "works in CI", which is exactly the class of problem Session 8 is about.
+That **the file has to exist on whatever machine runs Terraform.** Your laptop has it; a Jenkins agent starting from a fresh container does not. So a pipeline would need the key injected as a credential, or — better — you'd avoid `file()` for secrets entirely and pass the public key as a variable. It's a small thing that quietly breaks the transition from "works on my machine" to "works in CI".
 
 **`os_disk { }`** — the managed disk. `caching = "ReadWrite"` is a performance setting; `storage_account_type = "Standard_LRS"` is HDD-backed locally-redundant storage. Cheap, fine for training.
 
@@ -1142,9 +1142,10 @@ terraform apply
 # type: yes
 ```
 
-![understanding-resource-provisioning-28](./resources/understanding-resource-provisioning-28.png)
 
 **HANDS ON (25 min)** <br>
+
+- `SLIDE ACROSS`
 
 Part A *(10 min)* — the SSH key.
 1. *(In the Azure Portal)* Create an SSH key called `default-vm-ssh`, download the `.pem`
@@ -1257,6 +1258,8 @@ exit
 
 **If SSH refuses, check in this order:**
 
+- `SLIDE ACROSS`
+
 | Symptom | Cause |
 |---|---|
 | `Permission denied (publickey)` | `.pem` permissions. `ls -l` must show `-r--------` |
@@ -1274,13 +1277,19 @@ That last one will happen to somebody today, and the error is alarming — it's 
 
 We have a running, reachable machine — with nothing on it. Let's turn it into an actual web server.
 
-We said configuration management is Ansible's job, and that's still true — but Terraform has basic tooling for it, and seeing it makes clear where the boundary sits.
+Configuration management is Ansible's job, other tools exist but like Terraform, it's the dominate technology in its space. 
+
+Ansible lets you target hundreds and thousands of servers, group them by tags and my plays such as "Install Docker on all servers with a tag "production"... and install Jest on all servers with the tag 'test'". <br>
+
+Terraform does have basic tooling for it, and seeing it makes clear where the boundary sits.
 
 Two pieces are needed:
 - a **`connection`** block — *how* to reach the machine
 - a **`provisioner`** block — *what to run* once we're on it
 
 #### The connection block
+
+This lives inside our config for the **http_server**
 
 **main.tf**
 ```tf
@@ -1307,6 +1316,10 @@ variable "azure_ssh_private_key" {
 - **`user = "azureuser"`** — the `admin_username` we chose
 - **`private_key = file(...)`** — the **private** half this time, because we're authenticating *as* the client
 
+We need the Public Key to add to the Virtual Machine and the Private Key to then make changes to it from within Terraform. 
+
+That's our connection block. Now our **Provisioner** block. 
+
 #### The provisioner block
 
 **main.tf**
@@ -1329,24 +1342,21 @@ resource "azurerm_linux_virtual_machine" "http_server" {
 
 `remote-exec` runs commands **on the remote machine** over the connection we defined. `inline` takes a list, run in order.
 
-Walk through each command — all Session 2 material:
+Let's through each command — all Session 2 material:
 
-**`sudo apt-get update -y`** — refresh the package index. `sudo` runs as root; `apt-get` is the Debian/Ubuntu package manager; **`-y` auto-answers "yes"**. Essential in automation — there's no human to press y, exactly the trap from Session 2.
+**`sudo apt-get update -y`** — refresh the package index. `sudo` runs as root; `apt-get` is the Debian/Ubuntu package manager; **`-y` auto-answers "yes"**. Essential in automation — there's no human to press y.
 
 **`sudo apt-get install apache2 -y`** — install the Apache HTTP server.
 
 **`sudo systemctl start apache2`** — start the service.
 
-**NOTE FOR TRAINERS** <br>
-On Ubuntu the `apache2` package starts the service automatically on install, so this line is usually a no-op. **Keep it anyway** — being explicit makes the script portable (Amazon Linux does *not* auto-start `httpd`) and keeps the "install, then start" structure legible. <br>
-**END OF NOTE**
 
 **`echo ... | sudo tee /var/www/html/index.html`** — write our page. `echo` outputs the text, `|` pipes it into the next command, `sudo tee <file>` reads standard input and writes it to a file.
 
-**ASK** <br>
+
 Why `| sudo tee file` rather than the simpler `sudo echo ... > file`? <br>
 **ANSWER** <br>
-Because of **when the redirection happens**. In `sudo echo x > file`, the shell sets up the `>` redirection **first, as your normal user** — before `sudo` runs anything — so it fails with permission denied on a root-owned directory. Piping into `sudo tee` means the **writing program itself** runs as root. This trips up a lot of people and is genuinely useful to know.
+Because of **when the redirection happens**. In `sudo echo x > file`, the shell sets up the `>` redirection **first, as your normal user** — before `sudo` runs anything — so it fails with permission denied on a root-owned directory. Piping into `sudo tee` means the **writing program itself** runs as root. This trips up a lot of people.
 
 `/var/www/html` is Apache's default web root — the `/var` folder from Session 2, holding variable data that changes as the system runs.
 
@@ -1359,8 +1369,6 @@ Now apply:
 terraform validate
 terraform apply
 ```
-
-![understanding-resource-provisioning-30](./resources/understanding-resource-provisioning-30.png)
 
 **Nothing happens.** No changes planned.
 
@@ -1381,8 +1389,6 @@ terraform apply
 
 Watch the **destroy order**:
 
-![understanding-resource-provisioning-31](./resources/understanding-resource-provisioning-31.png)
-
 1. **azurerm_linux_virtual_machine** — first
 2. **azurerm_network_interface_security_group_association** — the NIC/NSG link
 3. **azurerm_network_interface** and **azurerm_public_ip**
@@ -1394,7 +1400,6 @@ Then on creation: VNet, subnets, NSG and rules → public IP and NIC → VM. The
 
 *(In your browser)* — paste the public IP into the address bar.
 
-![understanding-resource-provisioning-33.png](./resources/understanding-resource-provisioning-33.png)
 
 **What just happened, end to end:**
 1. Your browser routes to that IP, opens a **TCP** connection, and sends an **HTTP GET** — by default to **port 80**
@@ -1403,6 +1408,8 @@ Then on creation: VNet, subnets, NSG and rules → public IP and NIC → VM. The
 4. Your message comes back
 
 **You've automated the deployment of a working server in Azure.**
+
+- `SLIDE ACROSS`
 
 **HANDS ON (15 min)** <br>
 *(Run from `~/terraform-training/05-virtual-machines`)*
@@ -1503,6 +1510,8 @@ terraform apply          # type: yes — NOW the provisioner runs
 
 ---
 
+- `SLIDE ACROSS`
+
 **Challenge**
 
 *Direct* students, **in pairs**, to extend the provisioner so the served page:
@@ -1557,6 +1566,10 @@ terraform apply
 # type: yes
 ```
 
+I could find my IP address in the GUI but I can also refer to the state.
+
+Search for: `public_ip_address` in **terraform.tfstate**
+
 Then visit `http://<your-ip>` and `http://<your-ip>/health.html`.
 
 <br>
@@ -1566,6 +1579,7 @@ Then visit `http://<your-ip>` and `http://<your-ip>/health.html`.
 
 <br>
 <br>
+
 ### 14:00–14:30 — Immutable Servers, `data` Sources and `terraform graph`
 *(Activity: 10 min)*
 
