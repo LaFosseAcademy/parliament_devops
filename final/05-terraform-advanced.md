@@ -284,13 +284,13 @@ Full day, **09:00–17:00**, with a one-hour lunch and two 15-minute breaks.
 
 Morning. Quick recap, because today builds directly on Part 1.
 
-Yesterday you learned the Terraform **mechanics**: resource blocks, references, the three states, `plan` and `apply`, variables, and iterating with `count` and `for_each`. But everything you created was, honestly, quite small — a resource group, a storage account, some Azure AD users. Things with no dependencies and nothing to connect to.
+So yesterday you learned the Terraform **mechanics**: resource blocks, references, the three states, `plan` and `apply`, variables, and iterating with `count` and `for_each`. But everything you created was, honestly, quite small — a resource group, a storage account, some Azure AD users. Things with no dependencies and nothing to connect to.
 
 Today you provision **real infrastructure**: virtual machines that sit inside a network, behind security rules, reachable from the internet, and eventually behind a load balancer. And you'll hit the thing that makes this feel like real engineering — **a VM in Azure cannot exist on its own.** It needs a network, a subnet, a network interface, an IP address and security rules, all created in the right order.
 
-That's where yesterday's dependency graph stops being a nice idea and starts doing serious work for you.
+That's where yesterday's dependency graph, (where resources can be built in the right order) stops being a nice idea and starts doing serious work for you.
 
-Then this afternoon we fix the last big weakness in what you've built: **your state file is on your laptop.** Fine alone, useless in a team, and — critically — the one thing blocking you from running Terraform in a pipeline.
+Then this afternoon we'll try to fix the last big weakness in what you've built: **your state file is on your laptop.** Fine alone, useless in a team, and — critically — the one thing blocking you from running Terraform in a pipeline.
 
 **Standing rule again: anything we create, we destroy before we leave.** Today's resources genuinely cost money. VMs and load balancers are not free-tier-forever the way a couple of AD users were.
 
@@ -304,6 +304,14 @@ az resource list -o table    # anything left from last session?
 ```
 
 If `export | grep ARM` comes back empty, re-export the four variables now — everything today depends on them.
+
+
+```bash
+export ARM_CLIENT_ID=<appId>
+export ARM_CLIENT_SECRET='<password>'
+export ARM_SUBSCRIPTION_ID=<your-subscription-id>
+export ARM_TENANT_ID=<tenant>
+```
 
 **💬 SLACK — snippet 1**, post at 09:05:
 ```bash
@@ -325,11 +333,11 @@ Before writing any Terraform, let's walk the Portal wizard for creating a VM. No
 
 *(In the Azure Portal — search **Virtual machines**)*
 
-**What is a virtual server?** When a company has a server in a data centre, it's a **physical server** — where applications and databases get deployed. A **virtual machine** is a slice of a physical machine in someone else's data centre, which you rent and reach over the internet. They're not really "in the cloud" — they're in physical buildings all over the world; you just don't have to think about the building.
+When a company has a server in a data centre, it's a **physical server** — where applications and databases get deployed. A **virtual machine** is a slice of a physical machine in someone else's data centre, which you rent and reach over the internet. They're not really "in the cloud" — they're in physical buildings all over the world; you just don't have to think about the building.
 
-![understanding-resource-provisioning-1](./resources/understanding-resource-provisioning-1.png)
+We've been using `uksouth`. Today let's switch to **Sweden Central**. For some reasons on a free account it looks like we're blocked from using the vast majority of rejions and this is the closest.
 
-We've been using `uksouth`. Today let's switch to **North Europe** (Dublin), to prove regions are a one-line change.
+Aside from that though..
 
 **ASK** <br>
 By having multiple regions, what do we improve? <br>
@@ -345,12 +353,12 @@ touch config.md
 
 **config.md**
 ```md
-Location - northeurope
+Location - swedencentral
 ```
 
 Now walk the wizard.
 
-![understanding-resource-provisioning-2](./resources/understanding-resource-provisioning-2.png)
+- Click *Create -> Virtual Machine*
 
 #### Basics: project and instance details
 
@@ -358,18 +366,21 @@ Straightforward — a **name**, and a **resource group**. Exactly like the Azure
 
 #### Image (Marketplace Image)
 
-The **software** the machine boots with: Ubuntu Server, Windows Server, Red Hat, Debian. We'll choose **Ubuntu Server 22.04 LTS** — common and well-supported. (**LTS** = Long Term Support: security patches for years rather than months.)
+The **software** the machine boots with: Ubuntu Server, Windows Server, Red Hat, Debian. We'll choose **Ubuntu Server 24.04 LTS** — common and well-supported. (**LTS** = Long Term Support: security patches for years rather than months.)
 
-![understanding-resource-provisioning-3](./resources/understanding-resource-provisioning-3.png)
 
 Terms worth noting, because they show up in our Terraform:
 
-**`urn`** — the unique identifier for a Marketplace image: `publisher:offer:sku:version`. Four colon-separated parts.
+- `SLIDE ACROSS`
+
+**`urn`** — the unique identifier for a Marketplace image, it stands for **Uniform Resource Name: The format is `publisher:offer:sku:version`. Four colon-separated parts.
+
+SKU stands for **Stock Keeping Unit**, it's an identifer. 
 
 **ASK** <br>
-`publisher:offer:sku:version` — four parts identifying exactly one image. What's that the same as? <br>
+`publisher:offer:sku:version` — four parts identifying exactly one image. How could we compare this to something we've seen in Docker. <br>
 **ANSWER** <br>
-A **Docker image reference** — `registry/namespace/image:tag`. Same job: unambiguously name one specific artifact so anyone can pull the identical thing. And the same trap: `version = "latest"` is the equivalent of `:latest`, convenient and non-reproducible. We'll fix that this afternoon with a data source.
+A **Docker image reference** — `registry/namespace/image:tag`. Same job: unambiguously name one specific resource so anyone can pull the identical thing.
 
 **Gen2 VM** — boots using **UEFI** rather than the older Generation 1 / BIOS path.
 
@@ -381,39 +392,68 @@ Both are firmware that initialises hardware and loads the OS. Azure's **Generati
 
 **Architecture: x64** — 64-bit x86, the widest software and hardware support.
 
-**Accelerated Networking: Supported** — a high-performance networking path: **higher throughput**, **lower latency**.
+This is where Azure annoys me. In AWS we'd use a GUI to find an image we want. AWS calls it an AMI, Amazon Machine Imagine and it'll give us the ID we need right there and then. 
 
-**Disk type: Managed Disk** — the storage holding the OS. Roughly an EBS volume in AWS terms.
+Azure is difficult and we have to manually try and find it. 
+
+No need to run this yourself but:
+
+```bash
+az vm image list \
+  --location swedencentral \
+  --publisher Canonical \
+  --offer ubuntu-24_04-lts \
+  --sku server \
+  --architecture x64 \
+  --all \
+  --output table
+```
+
+- Canonical is the company behind Ubuntu 
+- the 'offer' is which specifc distribution we want
+- the 'sku' is just the image varient, we want Ubuntu Server
+
+It outputs lots of images we could use and the Uniform Resoruce Names. So I can grap one and add it to the notes. 
 
 **config.md**
 ```md
-Location - northeurope
-Marketplace Image (urn) - Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest
+Location - swedencentral
+Marketplace Image (urn) - Canonical:ubuntu-24_04-lts:server:latest
 ```
 
 #### Instance type (VM size)
 
 Software chosen; now the **hardware**. vCPUs, memory, storage, network performance.
 
-![understanding-resource-provisioning-5](./resources/understanding-resource-provisioning-5.png)
-
 What matters for us: eligibility under the **Azure free account** — a **B1s** burstable VM, free for 12 months. ("Burstable" means it accumulates CPU credits while idle and spends them on short bursts — perfect for a demo web server, useless for sustained compute.)
+
+If I click on *See all* we can see the different families of Virtual Machines available to us. 
+
+I'm going to look into the **B family** as its the cheaper options.
+
+There's information on the amount of virtual CPU's, RAM, Disk Data, Max InputOutput PerSecond and maybe most importantly, price. 
+
+The cost is per month but I'm going to choose: B2als_v2
+- 2 vCPUs, 4GB RAM
 
 **config.md**
 ```md
-Location - northeurope
-Marketplace Image (urn) - Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest
-VM size - Standard_B1s
+Location - swedencentral
+Marketplace Image (urn) - Canonical:ubuntu-24_04-lts:server:latest
+VM size - B2als_v2
 ```
+
+
 
 #### Networking — the part that matters most
 
-*REFER TO RESOURCE 3 - SLIDEE* <br>
-![understanding-resource-provisioning-6](./resources/understanding-resource-provisioning-6.png)
+- *Go to 'Networking' tab*
 
 In a physical data centre, resources are protected by a firewall on the device — inspecting packets and allowing or blocking them per your security policy.
 
 In the cloud we get the same thing with a **Virtual Network (VNet)** — your own private network. Inside it you create smaller **subnets** to hold resources.
+
+- `SLIDE ACROSS`
 
 Read the diagram outside-in:
 - Inside a **region** (North Europe) sits a **VNet**
@@ -423,35 +463,39 @@ Read the diagram outside-in:
 **ASK** <br>
 You've all written a `docker compose` file with an app container and a Postgres container. Which of those is reachable from the internet, and why? <br>
 **ANSWER** <br>
-Only whichever one you published a port for. **Postgres is reachable by the app**, over Docker's internal network, but not from outside unless you explicitly mapped a port. **A VNet is exactly that, at cloud scale** — a private network where things reach each other by default, and exposure to the outside is something you deliberately configure. If `docker compose` networking makes sense to you, you already understand VNets; the vocabulary is just heavier.
+Only whichever one you published a port for. **Postgres is reachable by the app**, over Docker's internal network, but not from outside unless you explicitly mapped a port. **A VNet is exactly that, at cloud scale** — a private network where things reach each other by default, and exposure to the outside is something you deliberately configure. 
 
 **Private vs public subnets.** A VM in a **private** subnet can only be reached from inside the VNet — where you'd put a **database**, or servers handling sensitive data. A VM with a **public IP attached** can be reached from outside — where you'd put an **HTTP server**.
 
-**NOTE FOR TRAINERS** <br>
-Flag this explicitly, because students coming from AWS material expect otherwise: **Azure does not pre-provision a default VNet** in every region. AWS gives you a default VPC you can adopt; Azure does not. When the Portal wizard notices you have no VNet, it offers to create one *as part of the wizard* — on demand, not sitting there in advance. Real consequence for our Terraform: **we must build the network ourselves**, and there's no `data` source to "adopt" a default. <br>
-**END OF NOTE**
+
 
 So we'll create **1** VNet and **3** subnets, one per availability zone.
 
-![understanding-resource-provisioning-10](./resources/understanding-resource-provisioning-10.png)
 
 **config.md**
 ```md
-Location - northeurope
-Marketplace Image (urn) - Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest
-VM size - Standard_B1s
+Location - swedencentral
+Marketplace Image (urn) - Canonical:ubuntu-24_04-lts:server:latest
+VM size - B2als_v2
 VNet - vnet-emilesherrott-devops
 ```
 
 #### Firewall (Network Security Group)
 
-**Network Security Groups (NSGs)** control traffic to resources beyond just choosing a subnet. They're their own resource, and a subnet — or a specific network interface — gets associated with the rules you define.
+- `SLIDE ACROSS`
+
+**Network Security Groups (NSGs)** under **NIC** which is a Network Interface Card control traffic to resources beyond just choosing a subnet. They're their own resource, and a subnet — or a specific network interface — gets associated with the rules you define.
+
+**ASK**<br>
+Which two ports do HTTP and HTTPS requests use? <br>
+**ANSWER**
+80 and 443
 
 The scenario that makes it concrete:
 - You want your VM in a **public** subnet so the internet can reach it
 - But you want to block anything that isn't HTTP or HTTPS, on ports 80 and 443
 
-So even though traffic reaches the subnet, the NSG blocks what shouldn't reach the VM. **An NSG is a set of firewall rules.**
+So even though traffic reaches the subnet, the Network Security Group blocks what shouldn't reach the Virtual Machine. **An NSG is a set of firewall rules.**
 
 **ASK** <br>
 Does anyone remember what **SSH** traffic is? <br>
@@ -460,17 +504,20 @@ Secure Shell — remotely log into and control a machine over an encrypted conne
 
 For a web server we'll allow **SSH (22)** and **HTTP (80)**.
 
-![understanding-resource-provisioning-15](./resources/understanding-resource-provisioning-15.png)
 
 #### Disks and Advanced
 
 Default Managed Disk is fine; leave Advanced alone.
 
+Advanced let's you do something called *"Bootstrapping"*, not the rubbish bootstrap you learnt on week 1 but bootstrapping is something you do as you start. I.e. *"You strap your boots on before going out"*. Technically if could be something like, installing Docker, Git, updating packages etc..
+
+We're not going to do that. 
+
 **The point of all that.** Look at everything we had to think about for **one** VM: regions, availability zones, virtual networks, subnets, network security groups.
 
-**ASK** <br>
+
 That was maybe fifteen decisions, and we haven't created anything. What happens when you need this VM in three regions, for three environments? <br>
-**ANSWER** <br>
+
 By hand it's fifteen decisions times nine, each an opportunity to click the wrong thing — and **no record of what you chose or why**. That's the ClickOps problem at full scale. In Terraform it's one configuration and a changed variable. This is exactly the case for automating it.
 
 We won't launch from the browser. Let's build it in VS Code.
@@ -482,6 +529,7 @@ We won't launch from the browser. Let's build it in VS Code.
 
 <br>
 <br>
+
 ### 10:15–11:15 — Building the Network: VNet, Subnets, NSG and Rules
 *(Activity: 20 min)*
 
@@ -514,9 +562,11 @@ provider "azurerm" {
 resource "azurerm_resource_group" "vm_resource_group" {
   name     = "rg-vm-emilesherrott-devops"
   # UPDATED — new region today
-  location = "northeurope"
+  location = "swedencentral"
 }
 ```
+
+- Remember all resources in Azure are associated with a Resource Group which is why we started with that. 
 
 *(Run from `~/terraform-training/05-virtual-machines`)*
 ```bash
@@ -552,9 +602,9 @@ Two new things to unpack properly.
 
 **`address_space = ["10.0.0.0/16"]`** — the range of private IP addresses this VNet can hand out. That `/16` is **CIDR notation**, which you met in Session 1. Quick refresher:
 
-- An IPv4 address is four numbers, each 0–255, because each is stored in **8 bits**
+- An IPv4 address is four numbers, each 0–255, because each is stored in **8 bits** of memory
 - The number after the slash says **how many bits are fixed** — the network part
-- `/16` fixes the first two numbers (`10.0`), leaving two free → about 65,000 addresses
+- `/16` fixes the first two numbers (`10.0`), leaving two numbers free (each can be between 0 and 255) → about 65,000 addresses
 - `/24` fixes the first three (`10.0.1`), leaving one free → 256 addresses
 
 **Bigger number = smaller network.** So our VNet is `10.0.0.0/16`, and each subnet carves a `/24` slice inside it.
@@ -576,13 +626,13 @@ Less repetition, and one place to change the pattern — but the real reason is 
 
 We're building an **HTTP server** — conventionally accessed on **port 80** via **TCP**.
 
-**How do TCP and HTTP fit together?** TCP is like two people on the phone: **connection** (you dial, they answer), **conversation** (taking turns, data flowing back and forth), **closing the call**. HTTP is the *structure of what's said* — how browsers and servers phrase requests and responses. TCP is the connection; HTTP is the conversation over it.
+TCP is like two people on the phone: **connection** (you dial, they answer), **conversation** (taking turns, data flowing back and forth), **closing the call**. HTTP is the *structure of what's said* — how browsers and servers phrase requests and responses. TCP is the connection; HTTP is the conversation over it.
 
 We also want **SSH** on **port 22** to connect in and configure the machine.
 
 And because this is a public web server, it must be reachable from anywhere — which means a **CIDR block** specifying which source IPs are allowed.
 
-*REFER TO RESOURCE 4 - SLIDEE* <br>
+- `SLIDE ACROSS`
 
 **`"0.0.0.0/0"`** — the **default route**, meaning "any address anywhere":
 - `0.0.0.0` — any address
@@ -590,7 +640,7 @@ And because this is a public web server, it must be reachable from anywhere — 
 
 Azure also accepts the wildcard `"*"` for the same thing.
 
-Now the NSG:
+Now the Network Security Group:
 
 **main.tf**
 ```tf
@@ -628,6 +678,8 @@ resource "azurerm_network_security_rule" "http_ingress" {
 
 Azure NSG rules need a few things worth explaining one at a time:
 
+- `SLIDE ACROSS`
+
 | Attribute | Meaning |
 |---|---|
 | `priority` | **Lower number is evaluated first.** Range 100–4096. Once a rule matches, evaluation **stops** |
@@ -641,12 +693,10 @@ Azure NSG rules need a few things worth explaining one at a time:
 **ASK** <br>
 Why is `source_port_range` almost always `*` while `destination_port_range` is specific? <br>
 **ANSWER** <br>
-Because the **destination** port identifies the service — 80 is "the web server", 22 is "SSH". The **source** port is an arbitrary high-numbered port the client's operating system picked for that connection, different every time. You can't predict it and have no reason to care. It's the same asymmetry as in your Express apps: you bind to a known port; you never care which ephemeral port the browser used.
+Because the **destination** port identifies the service — 80 is "the web server", 22 is "SSH". The **source** port however is an arbitrary high-numbered port the client's operating system picked for that connection, different every time. You can't predict it and have no reason to care. 
 
-**ASK** <br>
-"Lower priority number wins, and evaluation stops at the first match." Where have you seen that ordering behaviour before? <br>
-**ANSWER** <br>
-**Express middleware and route matching** — first matching route handles the request, and order in the file determines precedence. Also firewall rules generally, and `switch` statements. The practical consequence is identical: **a broad `Deny` rule with a low number will shadow every specific `Allow` after it**, which is the classic NSG debugging trap. Leave gaps in your numbering so you can insert rules later without renumbering everything.
+
+"Lower priority number wins, and evaluation stops at the first match." We've seen this before with **Express middleware and route matching** — first matching route handles the request, and order in the file determines precedence. Think about your debug assignment and the **/top snack endpoint**. 
 
 Now SSH:
 
@@ -672,14 +722,11 @@ resource "azurerm_network_security_rule" "ssh_ingress" {
 
 Note `priority = 110`. **Priorities must be unique within an NSG.** Leaving gaps (100, 110, 120) is a good habit.
 
-**NOTE FOR TRAINERS** <br>
-Worth calling out as a genuine platform difference: in **AWS**, a security group denies all outbound traffic unless you write an explicit `egress` rule. **Azure NSGs ship with built-in default rules including `AllowInternetOutBound`**, which already permits all outbound. So we don't need an outbound rule — and that's a deliberate design choice, not an oversight in our config. Students who've seen AWS material will go looking for it. <br>
-**END OF NOTE**
 
 **ASK** <br>
-We've opened SSH to `0.0.0.0/0` — the entire internet. Is that wise? <br>
+We've opened SSH to `0.0.0.0/0` — the entire internet: `source_address_prefix`. Is that wise? <br>
 **ANSWER** <br>
-**No**, not for anything real. Every SSH server exposed to the open internet gets continuously probed by automated bots trying default credentials — within minutes of it existing. In production you'd restrict `source_address_prefix` to your office or VPN range, or avoid public SSH entirely using Azure Bastion. We're doing it because a classroom on different networks is otherwise painful — but **it's a shortcut, and worth naming as one.** You'll narrow it in the take-home.
+**No**, not for anything real. Every SSH server exposed to the open internet gets continuously probed by automated bots trying default credentials — within minutes of it existing. In production you'd restrict `source_address_prefix` to your office or VPN range, or avoid public SSH entirely using Azure Bastion. We're doing it because a classroom on different networks is otherwise painful — but **it's a shortcut.**
 
 Now apply:
 
@@ -689,17 +736,20 @@ terraform validate
 terraform apply
 ```
 
-![understanding-resource-provisioning-16](./resources/understanding-resource-provisioning-16.png)
 
 - Type: `yes`
 
 *(In the Azure Portal — search **Network security groups**)* — click into `http-server-nsg`. Your inbound rules are there.
 
-![understanding-resource-provisioning-19](./resources/understanding-resource-provisioning-19.png)
-
-Scroll down and note the **default outbound rules**, already present without you defining anything.
+*Scroll down and note the default outbound rules*
 
 #### Tags, and ForceNew
+
+Let's add a tag as well. 
+
+We could be in the situation where we have 100s of Virtual Machines, some for testing, development or production. 
+
+Adding tags helps us target them a little more accurately. 
 
 **main.tf**
 ```tf
@@ -718,21 +768,23 @@ terraform apply
 # type: yes
 ```
 
-Get into the habit of tagging — `environment`, `owner`, `cost-centre` — exactly as in Session 1. Once you have hundreds of resources, untagged infrastructure becomes unmanageable and unattributable on the bill.
+Get into the habit of tagging — `environment`, `owner`, `who's paying for it`. Once you have hundreds of resources, untagged infrastructure becomes unmanageable and unattributable on the bill.
 
 Now go and read the docs:
 
 *GOOGLE: terraform azurerm network security group* <br>
 https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_security_group
 
-Scroll to **Argument Reference**. Notice some arguments are marked **`Changing this forces a new resource to be created`** — often shortened to **ForceNew**.
+Scroll to **Argument Reference**. Notice some arguments are marked **`Changing this forces a new resource to be created`**.
 
-![understanding-resource-provisioning-20](./resources/understanding-resource-provisioning-20.png)
+
 
 **ASK** <br>
 `name` is marked ForceNew. What happens if you rename an NSG that a running VM depends on? <br>
 **ANSWER** <br>
-Terraform will **destroy and recreate** it — and because the VM's association depends on it, that cascades. Same "must be replaced" behaviour as the storage account name in Part 1, and the same lesson: **read the plan**. The provider documentation tells you in advance which attributes are safe to change and which are destructive. Checking before editing something in production takes thirty seconds and occasionally saves your afternoon.
+Terraform will **destroy and recreate** it — and because the VM's association depends on it, that cascades. Same "must be replaced" behaviour as the storage account name in Part 1. The provider documentation tells you in advance which attributes are safe to change and which are destructive. Checking before editing something in production takes thirty seconds and occasionally saves your afternoon.
+
+- `SLIDE ACROSS`
 
 **HANDS ON (20 min)** <br>
 *(Run from `~/terraform-training/05-virtual-machines`)*
@@ -745,6 +797,8 @@ Terraform will **destroy and recreate** it — and because the VM's association 
 7. Add a `tags` block to the NSG and apply again
 8. Open the `azurerm_network_security_rule` docs and find **two** attributes marked ForceNew
 **END OF NOTE**
+
+Equally feel free to make notes on what we've covered so far or also browse the Azure Portal GUI for configuration options. 
 
 **💬 SLACK — snippet 2**, the VNet and subnets:
 ```tf
@@ -895,6 +949,7 @@ terraform apply
 
 <br>
 <br>
+
 ### 11:15–12:15 — SSH Keys, Public IP, NIC, and Your First VM
 *(Activity: 25 min)*
 
@@ -906,26 +961,25 @@ We've allowed SSH through the firewall — but that only opens the door. To conn
 
 *(In the Azure Portal — search **SSH keys**)*
 
-![understanding-resource-provisioning-21](./resources/understanding-resource-provisioning-21.png)
 
 Creating one asks for:
 - **name**
-- **key pair type**:
+- **key pair type**, at the bottom you'll see:
   - **RSA** — the long-established public-key algorithm, the standard for many cryptographic operations
   - **Ed25519** — newer, faster, and in some respects stronger
 - **key pair source**: **Generate new key pair** (Azure creates both halves), or **Use existing public key** (you've already run `ssh-keygen` locally)
 
-Create one with **name** `default-vm-ssh`, **type** `RSA`, **source** `Generate new key pair`.
+Create one with the **resource group** `rg-vm-emilesherrott-devops`, **region** `Sweden Central`, **name** `default-vm-ssh`, **type** `RSA`, **source** `Generate new key pair`.
 
-![understanding-resource-provisioning-22](./resources/understanding-resource-provisioning-22.png)
 
-Hit **Create**. Your browser immediately downloads `default-vm-ssh.pem` — the **private** key.
+Hit **Create**. Your browser should give you the option to download `default-vm-ssh.pem` — the **private** key.
 
-![understanding-resource-provisioning-23](./resources/understanding-resource-provisioning-23.png)
 
 **This file is how anyone gets full access to your VM.** Like your Terraform state, it must never go near GitHub. That's why today's `.gitignore` includes `*.pem`.
 
 Now set its permissions and store it sensibly:
+
+I like to create a folder at the route of my user called `azure` and another directory called `azure-ssh-keys`. I'm going to move mine there.
 
 *(Run from `~/Downloads` — wherever it landed)*
 ```bash
@@ -941,19 +995,19 @@ Recall `chmod` from Session 2. The three digits are three groups of people:
 `ls -l` should now show `-r--------`.
 
 **ASK** <br>
-Why does SSH insist on `400` rather than something more relaxed like `644`? <br>
+SSH insists on `400` rather than something more relaxed like `644`, why do you think? <br>
 **ANSWER** <br>
 `644` would let any other user on the machine **read** your private key — completely defeating the point of it being private. SSH checks this and flatly refuses to use a loosely-permissioned key. It's a rare and welcome case of a tool protecting you from yourself, and it's why the error message is so confusing when it happens: SSH says "Permission denied (publickey)", which sounds like the *server* rejected you, when actually your *own client* refused to offer the key.
 
 Store it consistently:
 
-*(Run from `~/`)*
+*(Run from `~/azure/azure_ssh_keys`)*
 ```bash
 mkdir -p ~/azure/azure_ssh_keys
 mv ~/Downloads/default-vm-ssh.pem ~/azure/azure_ssh_keys/
 ```
 
-You'll also need the **public** half for Terraform. Azure only gave you the private key, so derive the public one:
+You'll also need the **public** half for Terraform, so we can provide it to the Virtual Machines when they're created. Azure only gave you the private key, so derive the public one:
 
 *(Run from `~/azure/azure_ssh_keys`)*
 ```bash
@@ -961,13 +1015,9 @@ ssh-keygen -y -f default-vm-ssh.pem > default-vm-ssh.pub
 ls -la
 ```
 
-`ssh-keygen -y` reads a private key (`-f`) and prints its matching public key, which we redirect into a `.pub` file with `>` — the redirection from Session 2.
+`ssh-keygen -y` reads a private key (`-f`) and prints its matching public key, which we redirect into a `.pub` file with `>`.
 
-**NOTE FOR TRAINERS** <br>
-You *could* generate a key pair in Terraform with the `tls_private_key` resource, or store an existing public key with `azurerm_ssh_public_key`. The catch is that `tls_private_key` writes the **private key into your state file in plain text** — exactly the thing this afternoon is about avoiding, and the same trap as `random_password` from Part 1's take-home. Doing it out-of-band as we have is the more honest teaching path, and worth saying out loud, because students will find `tls_private_key` in the docs and wonder why we didn't use it. <br>
-**END OF NOTE**
-
-This step is easily forgotten and blocks everything downstream — note it in `session5-notes.md`.
+This step is easily forgotten and blocks everything downstream — note it in `05-session-notes.md`.
 
 #### Public IP and Network Interface
 
@@ -1005,6 +1055,8 @@ resource "azurerm_network_interface_security_group_association" "http_server_nic
 }
 ```
 
+- `SLIDE ACROSS`
+
 Three resources, each doing one job.
 
 **`azurerm_public_ip`** — a routable internet address.
@@ -1017,10 +1069,12 @@ Three resources, each doing one job.
 
 **`azurerm_network_interface_security_group_association`** — a **join resource**, whose only job is linking two other resources. It has no properties of its own beyond the two IDs.
 
-**ASK** <br>
-Why is the NSG association a *separate resource*, rather than an attribute on the network interface? <br>
-**ANSWER** <br>
-Because the relationship is **many-to-many** and has its own lifecycle. One NSG can be associated with many NICs and many subnets; making it a separate resource means you can attach and detach without modifying either side. If you've ever modelled a many-to-many relationship in SQL, you built a **join table** for exactly the same reason — you can't put it on either side, so it becomes its own thing. You'll meet this pattern repeatedly in Terraform; the load balancer this afternoon uses several.
+So: 
+- `azurerm_public_ip` gives our server an internet address. 
+- `azurerm_network_interface` connecects the server to the network
+
+
+The Network Security Group is a seperate resource, rather than an attribute on the Network Interface because the relationship is **many-to-many** and has its own lifecycle. One NSG can be associated with many NICs and many subnets; making it a separate resource means you can attach and detach without modifying either side. If you've ever modelled a many-to-many relationship in SQL, you built a **join table** for exactly the same reason.
 
 #### The Virtual Machine
 
@@ -1028,12 +1082,12 @@ Because the relationship is **many-to-many** and has its own lifecycle. One NSG 
 ```tf
 [ . . . ]
 
+# NEW CONFIG
 resource "azurerm_linux_virtual_machine" "http_server" {
-  # NEW CODE
   name                  = "http-server"
   resource_group_name   = azurerm_resource_group.vm_resource_group.name
   location              = azurerm_resource_group.vm_resource_group.location
-  size                  = "Standard_B1s"
+  size                  = "B2als_v2"
   admin_username        = "azureuser"
   network_interface_ids = [azurerm_network_interface.http_server_nic.id]
 
@@ -1049,13 +1103,12 @@ resource "azurerm_linux_virtual_machine" "http_server" {
 
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts-gen2"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
     version   = "latest"
   }
 }
 
-# NEW CONFIG
 variable "azure_ssh_public_key" {
   default = "~/azure/azure_ssh_keys/default-vm-ssh.pub"
 }
