@@ -1770,37 +1770,32 @@ Two engineers are working on the same infrastructure. Each has their own copy of
 **ANSWER** <br>
 Each has their **own local state file**, so each has a different idea of what exists. Engineer A creates a VM; A's state knows about it, B's doesn't. B runs `apply` and Terraform — seeing no record — tries to create it again. You get duplicates, or errors, or worse: **B's apply destroys something A created**, because B's state says it shouldn't exist.
 
-**ASK** <br>
-So we commit the state file to Git and share it that way? <br>
-**ANSWER** <br>
-**No** — two reasons. **Security**: state contains attribute values unencrypted, including secrets. You proved that yourself in Part 1 with `grep -i password terraform.tfstate`. **Reliability**: even ignoring security, you cannot guarantee everyone always adds, commits and pushes state at exactly the right moment. Someone forgets to push, someone else pulls a stale version, and you're back to conflicting views of reality — now with **merge conflicts in a machine-generated JSON file** nobody can resolve by hand.
+We don't commit the state file for two reasons. **Security**: state contains attribute values unencrypted, including secrets. We saw that yesterday with `grep -i password terraform.tfstate`. Also **Reliability**: even ignoring security, you cannot guarantee everyone always adds, commits and pushes state at exactly the right moment. Someone forgets to push, someone else pulls a stale version, and you're back to conflicting views of reality — now with **merge conflicts in a machine-generated JSON file** nobody can resolve by hand.
 
-**ASK** <br>
-"A shared file that multiple people read and write, that must never be stale, that can't tolerate concurrent writes." What are you actually describing? <br>
-**ANSWER** <br>
-**A database.** And once you frame it that way, the solution is obvious: it needs to live in **one authoritative place**, with **locking** so two writers can't collide, **access control**, and ideally **versioning** so you can roll back a corrupted write. You wouldn't email a SQLite file around a team; the same reasoning applies here.
 
-**The answer is a remote backend** — state stored centrally in cloud storage, which every engineer and every pipeline reads from and writes to.
+If we describe a shared file that multiple people read and write, that must never be stale, that can't tolerate concurrent writes. It's an awful lot like a DB.
+
+If we frame it that way, the solution is a little clearer: it needs to live in **one authoritative place**, with **locking** so two writers can't collide, we also need **access control**, and ideally **versioning** so you can roll back a corrupted write.
+
+**So what we need to impliment is a remote backend** — state stored centrally in cloud storage, which every engineer and every pipeline reads from and writes to.
 
 #### Locking
 
-Two engineers run `terraform apply` at the same moment. Both read state, both compute a plan from it, both start making changes. Neither knows about the other, and state ends up corrupted.
+Let's discuss locking. Two engineers run `terraform apply` at the same moment. Both read state, both compute a plan from it, both start making changes. Neither knows about the other, and state ends up corrupted.
 
 The fix is **locking**:
 1. **Lock** the state before applying, so nobody else can start
 2. Make the changes and update state
 3. **Unlock** it
 
-**NOTE FOR TRAINERS** <br>
-Another good comparison with the AWS material. There, students had to stand up a whole extra resource — a **DynamoDB table** — purely to hold locks alongside the S3 bucket. <br>
-Azure's `azurerm` backend needs no equivalent: locking is handled automatically with a **blob lease** on the state file itself, a native feature of Azure Blob Storage. **One fewer resource to create, pay for and maintain.** A genuine simplification worth calling out. <br>
-**END OF NOTE**
 
 An Azure Storage Account gives us everything:
-- **Locking** — automatic, via blob lease
-- **Encryption at rest** — on by default, no extra resource
+- **Locking** — automatic, via blob lease (a temporary lock we get with blob storage)
+- **Encryption at rest** — on by default, no extra resource (it automatically encrpyts our state when its in storage)
 - **Versioning** — turn on blob versioning and a corrupted state can be rolled back
 - **Access control** — RBAC, so only the right identities can read it
+
+- `SLIDE ACROSS`
 
 **HANDS ON — research (15 min)** <br>
 Before we build it, spend fifteen minutes reading and writing. **In pairs**, produce short written answers to:
@@ -1846,6 +1841,7 @@ You must already have a matching `resource` block written; import only creates t
 
 <br>
 <br>
+
 ### 15:15–16:45 — Capstone: Load-Balanced VMs & a Remote Backend
 *(Activity: 90 min)*
 
@@ -1853,10 +1849,10 @@ Two connected pieces. **Part A** scales your single VM into a load-balanced flee
 
 Work individually or in pairs. **Get Part A running and verified before starting Part B.**
 
-**NOTE FOR TRAINERS** <br>
-Watch the clock and the cost here. Part A is the more satisfying half — seeing traffic alternate between three servers is genuinely memorable — but **Part B is the more important one**, because it's the blocker for Session 8. <br>
-If the room is running slow at 16:00, cut Part A's stretch work and make sure everyone completes Part B. A student who leaves without a working remote backend will be stuck in the integration session. <br>
-**END OF NOTE**
+Watch the clock and the cost here. Part A is the more satisfying half — seeing traffic alternate between three servers is genuinely memorable — but **Part B is the more important one**. <br>
+
+Make sure by 16:00 if you haven't started **Part B** to cut Part A's stretch work and complete Part B. 
+
 
 ---
 
@@ -1932,10 +1928,10 @@ resource "azurerm_network_interface_security_group_association" "http_server_nic
 
 **`azurerm_public_ip.http_server_pips[each.key].id`** — reach into the *matching* public IP by key. Because every collection shares the same keys, everything lines up: **NIC `"2"` gets public IP `"2"` in subnet `"2"`.**
 
-**ASK** <br>
+**ASK YOURSELF** <br>
 Why is keying everything consistently like this so much safer than three sets of numbered resources? <br>
 **ANSWER** <br>
-Because **the key is the identity**. Remove subnet `"2"` from the map and Terraform removes exactly that subnet, its NIC, its public IP and its VM — leaving `"1"` and `"3"` untouched. With positional indexes everything after the removal would shift and get rebuilt. It's Part 1's list-versus-set lesson — the React `key` prop problem — now applied to real infrastructure where "rebuilt" means **real downtime**.
+Because **the key is the identity**. Remove subnet `"2"` from the map and Terraform removes exactly that subnet, its NIC, its public IP and its VM — leaving `"1"` and `"3"` untouched. With positional indexes everything after the removal would shift and get rebuilt. It's Part 1's list-versus-set lesson.
 
 Add an output:
 
@@ -1954,10 +1950,30 @@ output "http_server_public_ips" {
 
 That's a **`for` expression** — HCL's comprehension syntax. Read it as: "for each key `k` and value `pip` in the collection, produce an entry mapping `k` to `pip.ip_address`". The `{ }` means we're building a map; `[ ]` would build a list.
 
-**ASK** <br>
-`{ for k, v in collection : k => v.something }`. What's the JavaScript? <br>
-**ANSWER** <br>
-`Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v.something]))` — or more readably, a `.map()` that rebuilds an object. HCL's version is arguably tidier. The square-bracket form `[for x in list : x.name]` is just `.map(x => x.name)`.
+Suppose we had a JS object:
+
+```js
+const collection = {
+  server1: { ip: "10.0.0.1" },
+  server2: { ip: "10.0.0.2" }
+};
+```
+
+Our HCL for loop could look like:
+
+```tf
+{ for k, v in collection : k => v.ip }
+# For the key, value in collection, create a dictionary (map) where the key is the key and the value is v.ip
+```
+
+Producing a result like:
+
+```js
+{
+  server1 = "10.0.0.1"
+  server2 = "10.0.0.2"
+}
+```
 
 ---
 
@@ -1971,7 +1987,7 @@ resource "azurerm_linux_virtual_machine" "http_servers" {
   name                  = "http-server-${each.key}"
   resource_group_name   = azurerm_resource_group.vm_resource_group.name
   location              = azurerm_resource_group.vm_resource_group.location
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2als_v2"
   admin_username        = "azureuser"
   network_interface_ids = [azurerm_network_interface.http_server_nics[each.key].id]
 
@@ -1987,8 +2003,8 @@ resource "azurerm_linux_virtual_machine" "http_servers" {
 
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts-gen2"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
     version   = data.azurerm_platform_image.ubuntu_latest.version
   }
 
@@ -2014,7 +2030,7 @@ resource "azurerm_linux_virtual_machine" "http_servers" {
 }
 ```
 
-Note the message now includes `${each.key}` — **each server identifies itself.** That's how we'll prove the load balancer is actually distributing traffic.
+Note the provisioner message now includes `${each.key}` — **each server identifies itself.** That's how we'll prove the load balancer is actually distributing traffic.
 
 *(Run from `~/terraform-training/06-vms-with-lb`)*
 ```bash
@@ -2025,9 +2041,8 @@ terraform apply
 
 Three HTTP servers. There's a lot of output — three VMs, each being SSH'd into and configured. Terraform does this **in parallel** where the graph allows, which is why the output interleaves.
 
-**NOTE FOR TRAINERS** <br>
-Watch the cost. A single B1s is free-tier for 12 months, but **three at once burns that allowance three times as fast**, and the Standard-SKU public IPs and load balancer are **chargeable from the first minute**. Keep runtime short and make sure everyone destroys. Good live example of the cost-consciousness point from Session 1. <br>
-**END OF NOTE**
+
+Watch the cost. A single "Standard_B2als_v2" has a managable cost, but **three at once burns that allowance three times as fast**, and the Standard-SKU public IPs and load balancer are **chargeable from the first minute**. Keep runtime short and make sure you destroy resources after using.
 
 ---
 
@@ -2062,10 +2077,10 @@ resource "azurerm_network_security_rule" "lb_http_ingress" {
 }
 ```
 
-**ASK** <br>
+**ASK YOURSELF** <br>
 Why does the load balancer's NSG have an HTTP rule but **no SSH rule**? <br>
 **ANSWER** <br>
-**Least privilege.** The load balancer's job is to accept web traffic and pass it on — nobody should ever SSH into it. Every port you open is attack surface, so you open only what's needed. Same principle as scoping a Service Principal to one resource group rather than a whole subscription in Session 1, and the same principle as `Contributor` rather than `Owner` in Part 1.
+**Least privilege.** The load balancer's job is to accept web traffic and pass it on — nobody should ever SSH into it. Every port you open is attack surface, so you open only what's needed. Same principle as scoping a Service Principal to one resource group rather than a whole subscription, and the same principle as `Contributor` rather than `Owner`.
 
 **Unlike AWS's all-in-one Classic Load Balancer, Azure spreads this across several linked resources**: a frontend Public IP, the Load Balancer, a Backend Address Pool, a Health Probe, and a Load Balancing Rule.
 
@@ -2073,9 +2088,9 @@ The options, before we build:
 
 | Option | For |
 |---|---|
-| **Basic SKU** | The oldest tier, comparable to a Classic ELB. Being retired |
+| **Basic SKU** | The oldest tier, being retired |
 | **Standard SKU** | Zone-redundant, higher scale, secure by default. **What we'll use** |
-| **Application Gateway** | Azure's ALB equivalent. HTTP(S) content-based routing, path-based rules, WebSockets |
+| **Application Gateway** | HTTP(S) content-based routing, path-based rules, WebSockets |
 | **Azure Front Door** | Global routing and caching, worldwide content delivery |
 
 **main.tf**
@@ -2146,7 +2161,7 @@ Reading the pieces:
 
 **`azurerm_lb_probe`** — the health check.
 
-**ASK** <br>
+**ASK YOURSELF** <br>
 Why does a load balancer need a health probe — why not just send traffic to all three servers? <br>
 **ANSWER** <br>
 Because a server can be **running** while being **broken** — Apache crashed, disk full, app wedged. The probe repeatedly requests `/`; if a server stops responding correctly it's **taken out of rotation automatically**, and put back when it recovers. Without it, the load balancer cheerfully sends a third of your users to a dead machine. **This is what turns three servers into genuine resilience rather than just three servers.**
@@ -2175,11 +2190,11 @@ terraform apply
 
 *(In your browser)* — visit the `lb_public_ip` value.
 
-![understanding-resource-provisioning-58](./resources/understanding-resource-provisioning-58.png)
 
-**NOTE FOR STUDENTS** <br>
+
 Don't panic if the first request fails — the load balancer and its health probe take **a few minutes** to settle, and until the probe confirms a server is healthy it won't route to it. <br>
-**END OF NOTE**
+Also remeber to make your request as `HTTP` requests, not `HTTPS`
+
 
 Keep refreshing. You'll see it alternate between servers 1, 2 and 3 — the message you wrote with `${each.key}` telling you which one you hit.
 
@@ -2200,9 +2215,10 @@ terraform destroy
 # type: yes
 ```
 
-**💬 SLACK — snippet 8**, the whole load balancer set — **definitely post this, it's five resources**. *(Contents as in the `main.tf` block above.)*
 
 **Solution — Part A**
+
+*Please note the solution uses `jbloggs` as afunctional creater in resource group and virtual network names, etc.*
 
 The complete `main.tf`:
 
@@ -2222,7 +2238,7 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "vm_resource_group" {
   name     = "rg-vm-jbloggs-devops"
-  location = "northeurope"
+  location = "swedencentral"
 }
 
 resource "azurerm_virtual_network" "vm_vnet" {
@@ -2278,7 +2294,7 @@ resource "azurerm_linux_virtual_machine" "http_servers" {
   name                  = "http-server-${each.key}"
   resource_group_name   = azurerm_resource_group.vm_resource_group.name
   location              = azurerm_resource_group.vm_resource_group.location
-  size                  = "Standard_B1s"
+  size                  = "Standard_B2als_v2"
   admin_username        = "azureuser"
   network_interface_ids = [azurerm_network_interface.http_server_nics[each.key].id]
 
@@ -2294,8 +2310,8 @@ resource "azurerm_linux_virtual_machine" "http_servers" {
 
   source_image_reference {
     publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts-gen2"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
     version   = data.azurerm_platform_image.ubuntu_latest.version
   }
 
@@ -2429,7 +2445,7 @@ terraform apply
 ls -la          # note terraform.tfstate is HERE, locally
 ```
 
-**ASK** <br>
+**ASK YOURSELF** <br>
 Why two separate sub-projects rather than one? <br>
 **ANSWER** <br>
 **Chicken and egg.** You can't store a project's state in a storage account that the same project is responsible for creating — the first `apply` would need the backend to exist before it had created it. So `backend-state` creates the storage; `users` consumes it. And in practice one backend storage account serves **many** projects: users, VMs, load balancers, all of them.
@@ -2484,8 +2500,6 @@ resource "azurerm_storage_container" "tfstate_container" {
 
 **On naming the storage account** — you have a choice of scope:
 
-*REFER TO RESOURCE 7 - SLIDEE* <br>
-
 - **One account for everything** — all state, all projects, all environments
 - **One per environment** — `stdevbackend`, `stprodbackend`
 - **One per application per environment** — `stapplicationnamebackend`
@@ -2535,16 +2549,14 @@ terraform {
 - `resource_group_name` / `storage_account_name` / `container_name` — where the storage lives
 - `key` — the **blob name** the state is stored under. **This is what separates one project's state from another's** in the same container
 
-**NOTE FOR TRAINERS** <br>
-Values in a `backend` block **cannot be interpolated** — no `var.` references, no expressions. A genuine limitation that surprises people, and it exists because the backend must be resolved **before** Terraform has evaluated any variables. Teams handle it with **partial configuration**: leave values out and supply them at init time with `terraform init -backend-config=dev.hcl`. Worth mentioning as the answer to "but how do we vary this per environment?" <br>
-**END OF NOTE**
+
+Values in a `backend` block **cannot be interpolated** — no `var.` references, no expressions. It exists because the backend must be resolved **before** Terraform has evaluated any variables.
 
 *(Run from `~/terraform-training/07-backend-state/users`)*
 ```bash
 terraform init
 ```
 
-![understanding-resource-provisioning-65](./resources/understanding-resource-provisioning-65.png)
 
 Terraform detects the backend change and asks whether to **copy the existing local state** to the new backend.
 
@@ -2604,27 +2616,9 @@ terraform apply
 
 *(In the Azure Portal — the `tfstate` container)* — refresh until you see the `dev/` prefix.
 
-**ASK** <br>
-Blob storage is flat — there are no real folders. So what does putting slashes in the key achieve? <br>
-**ANSWER** <br>
-Azure's tooling **displays** slash-separated prefixes as a folder hierarchy, so it's browsable. More importantly it gives a **consistent, predictable convention** — any engineer can work out where a given project's state lives — and you can grant **RBAC access by prefix**, letting a team read `dev/` state but not `prod/`. The structure carries meaning even though the storage is flat. It's exactly like S3 "folders", or the way you'd namespace Redis keys.
 
-**💬 SLACK — snippet 9**, the backend block:
-```tf
-  # Goes INSIDE the terraform { } block.
-  # Values CANNOT be variables — this must be literal.
-  backend "azurerm" {
-    resource_group_name  = "rg-backend-state-CHANGEME-devops"
-    storage_account_name = "stdevappsbackendCHANGEME"
-    container_name       = "tfstate"
-    key                  = "dev/07-backend-state/users/backend-state.tfstate"
-  }
-```
-```bash
-terraform init -reconfigure     # then 'yes' to copy state up
-rm terraform.tfstate terraform.tfstate.backup
-terraform plan                  # works with NO local state
-```
+Azure's tooling **displays** slash-separated prefixes as a folder hierarchy, so it's browsable. More importantly it gives a **consistent, predictable convention** — any engineer can work out where a given project's state lives — and you can grant **RBAC access by prefix**, letting a team read `dev/` state but not `prod/`. The structure carries meaning even though the storage is flat.
+
 
 **Solution — Part B**
 
@@ -2677,7 +2671,7 @@ terraform init -reconfigure
 terraform apply         # type: yes
 ```
 
-**Stretch, if anyone finishes early:**
+**Stretch:**
 - Open two terminals in the `users` folder. Start `terraform apply` in one and, while it's waiting for confirmation, run `terraform plan` in the other. **Watch the second one report the state is locked**, and see whose lock it is
 - Turn on blob versioning in the Portal and look at the version history of your state blob after a few applies
 
