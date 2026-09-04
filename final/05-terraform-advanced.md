@@ -1727,6 +1727,8 @@ terraform apply     # -> No changes. Just reorganised.
 
 Remember from Part 1: Terraform reads **every `.tf` file in the directory** and concatenates them. Filenames are for humans.
 
+- `SLIDE ACROSS`
+
 **HANDS ON (10 min)** <br>
 *(Run from `~/terraform-training/05-virtual-machines`)*
 1. Add the `data "azurerm_platform_image"` block, apply, and inspect it in `terraform console`
