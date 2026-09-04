@@ -1585,32 +1585,27 @@ Then visit `http://<your-ip>` and `http://<your-ip>/health.html`.
 
 #### Why immutability is the point, not a limitation
 
-Before lunch you couldn't change the HTML with `terraform apply` — you had to destroy and recreate. That felt like a limitation. **It's actually the recommended pattern**, and worth understanding why.
+Before lunch you couldn't change the HTML with `terraform apply` — you had to destroy and recreate. That felt like a limitation. **It's actually the recommended pattern**, so let's take a moment to just understand why.
 
-*REFER TO RESOURCE 5 - SLIDEE* <br>
-![understanding-resource-provisioning-34](./resources/understanding-resource-provisioning-34.png)
 
-**The mutable approach.** Suppose servers could be modified in place. Every change means running a script against a live machine. Over months you accumulate a history of scripts, applied in some order, to some machines.
+
+**With a mutable approach.** Suppose servers could be modified in place. Every change means running a script against a live machine. Over months you accumulate a history of scripts, applied in some order, to some machines.
 
 **ASK** <br>
 Six months in, you need a brand new server identical to the existing ones. What do you have to do? <br>
 **ANSWER** <br>
 Re-run **every script, in exactly the original order** — and hope none were applied by hand, out of order, or only to some machines. In practice nobody can reconstruct that reliably, which is how **"snowflake servers"** happen: machines nobody dares touch because nobody knows how they got that way. It's environment drift from Session 1, at the level of individual servers.
 
-*REFER TO RESOURCE 6 - SLIDEE* <br>
-![understanding-resource-provisioning-35](./resources/understanding-resource-provisioning-35.png)
 
-**The immutable approach.** A server is never modified. Want a change? Provision a **new** server from the updated configuration and destroy the old one. Every machine is built once, from a single declarative description, and is therefore identical to every other machine built from it.
+**The immutable approach on the other hand.** A server is never modified. Want a change? Provision a **new** server from the updated configuration and destroy the old one. Every machine is built once, from a single declarative description, and is therefore identical to every other machine built from it.
 
 **ASK** <br>
 You already do this daily with something else. What? <br>
 **ANSWER** <br>
-**Docker containers.** You never SSH into a running container to patch it — you change the Dockerfile, build a new image, and replace the container. **You already have the instinct**; today just applies it one layer down, to the servers themselves. And notice the parallel goes further: a Dockerfile is a declarative description of a machine's contents, built once, producing identical results. Terraform's `remote-exec` is the *imperative* version of the same idea, which is precisely why HashiCorp calls provisioners a last resort.
+**Docker containers.** You never SSH into a running container to patch it — you change the Dockerfile, build a new image, and replace the container. 
 
-**ASK** <br>
-What does this pattern do for your ability to roll back a bad change? <br>
-**ANSWER** <br>
-Makes it trivial and **reliable**. The previous configuration is in Git; revert the commit and apply, and you get exactly the previous state — **not "the previous state plus whatever hand-fixes accumulated"**. Same as reverting a commit and redeploying, rather than trying to un-patch a live server.
+All of this helps your ability to roll back a bad change. <br>
+It makes it trivial and **reliable**. The previous configuration is in Git; revert the commit and apply, and you get exactly the previous state — **not "the previous state plus whatever hand-fixes accumulated"**. Same as reverting a commit and redeploying, rather than trying to un-patch a live server.
 
 #### Data sources
 
@@ -1628,8 +1623,8 @@ A **`data` source** looks up information Terraform **doesn't manage**. A `resour
 data "azurerm_platform_image" "ubuntu_latest" {
   location  = azurerm_resource_group.vm_resource_group.location
   publisher = "Canonical"
-  offer     = "0001-com-ubuntu-server-jammy"
-  sku       = "22_04-lts-gen2"
+  offer     = "ubuntu-24_04-lts"
+  sku       = "server"
 }
 ```
 
@@ -1637,12 +1632,11 @@ data "azurerm_platform_image" "ubuntu_latest" {
 - `location` — image catalogues vary slightly by region
 - `publisher / offer / sku` — the same identifiers, **without** the version. That's what we're asking it to find
 
-References get a `data.` prefix: `data.azurerm_platform_image.ubuntu_latest.version`.
 
 **ASK** <br>
-`resource` creates and owns; `data` only reads. What's the practical difference when you run `terraform destroy`? <br>
+`resource` creates and owns; `data` only reads. What do you think is the practical difference when you run `terraform destroy`? <br>
 **ANSWER** <br>
-**Data sources are never destroyed**, because Terraform doesn't own them — it just looked them up. That's the whole distinction: `resource` means "I am responsible for this thing's existence"; `data` means "this exists independently and I need to know about it". Getting that boundary right is how you safely reference infrastructure another team owns without accidentally managing — or deleting — it.
+**Data sources are never destroyed**, because Terraform doesn't own them — it just looked them up. A `resource` means "I am responsible for this thing's existence"; `data` means "this exists independently and I need to know about it". 
 
 *(Run from `~/terraform-training/05-virtual-machines`)*
 ```bash
@@ -1652,16 +1646,16 @@ terraform console
 ```
 data.azurerm_platform_image.ubuntu_latest
 ```
-![understanding-resource-provisioning-46](./resources/understanding-resource-provisioning-46.png)
 
-There's a resolved **`version`** — a real build number, not the string `"latest"`. Use it:
+
+There's a resolved **`version`** — a real build number, not the string `"latest"`. We should use it within the **linux virtual machine - http_server**:
 
 **main.tf**
 ```tf
 source_image_reference {
   publisher = "Canonical"
-  offer     = "0001-com-ubuntu-server-jammy"
-  sku       = "22_04-lts-gen2"
+  offer     = "ubuntu-24_04-lts"
+  sku       = "server"
   # NEW CONFIG
   version   = data.azurerm_platform_image.ubuntu_latest.version
 }
@@ -1672,12 +1666,9 @@ source_image_reference {
 terraform apply
 ```
 
-May or may not show a change, depending on whether a newer build shipped since you last applied.
+May or may not show a change, depending on whether a newer build shipped since you last applied. Now though we have the version number in our **terraform.tfstate** and if we ever get audited to make sure we're using a good fair version. We've got the evidence. 
 
-**NOTE FOR TRAINERS** <br>
-Good moment to compare with the AWS material. There, students used `data "aws_default_vpc"` to *adopt* an already-existing default VPC and `data "aws_subnets"` to find its subnets — necessary because AWS provisions those automatically in every region. <br>
-Here we needed neither, because we **created our own** VNet and subnets. `azurerm_subnet.public_subnets["1"].id` was already dynamic; there was never a hardcoded value to remove. **Azure having no "default network" to adopt means less need for this flavour of data source.** Worth a minute — it's a real platform difference, not an omission. <br>
-**END OF NOTE**
+If I look in our **Known State** there's a new resource with a **mode** of `data`, that'll hold the value we would potentially need. 
 
 #### terraform graph
 
@@ -1685,7 +1676,7 @@ Here we needed neither, because we **created our own** VNet and subnets. `azurer
 ```bash
 terraform graph
 ```
-![understanding-resource-provisioning-51](./resources/understanding-resource-provisioning-51.png)
+
 
 That output is a **digraph** in the DOT language — a description of every resource and what depends on what.
 
@@ -1693,14 +1684,9 @@ That output is a **digraph** in the DOT language — a description of every reso
 
 Arrows show dependency. `azurerm_linux_virtual_machine.http_server` depends on the data source, the NIC, and through that the subnet, VNet, public IP and NSG.
 
-![understanding-resource-provisioning-52](./resources/understanding-resource-provisioning-52.png)
 
 **This graph is exactly what Terraform builds internally** to decide creation and destruction order, and what can safely run in parallel.
 
-**ASK** <br>
-You've all seen a dependency graph before. Where? <br>
-**ANSWER** <br>
-**`npm ls`**, or the dependency graph on a GitHub repo. Same structure, same purpose: work out what depends on what so you can install (or create) in a valid order, and detect cycles. It's genuinely useful for reading an unfamiliar Terraform codebase, in the same way `npm ls` helps you understand an unfamiliar project.
 
 #### Refactoring into logical files
 
