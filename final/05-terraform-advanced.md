@@ -2188,6 +2188,13 @@ terraform apply
 # type: yes
 ```
 
+- *On your subscription level, you may be blocked from having 3 Public IPs for your VMs. If so, remove one key/pair from `resource "azurerm_subnet" "public_subnets"`
+
+```tf
+resource "azurerm_subnet" "public_subnets" {
+  for_each             = { "1" = "10.0.1.0/24", "2" = "10.0.2.0/24" }
+```
+
 *(In your browser)* — visit the `lb_public_ip` value.
 
 
@@ -2196,7 +2203,10 @@ Don't panic if the first request fails — the load balancer and its health prob
 Also remeber to make your request as `HTTP` requests, not `HTTPS`
 
 
+
 Keep refreshing. You'll see it alternate between servers 1, 2 and 3 — the message you wrote with `${each.key}` telling you which one you hit.
+
+- *Once refreshing if you don't see the VM switch, try opening up the Public IP address of the Load Balancer on a second device or with a friend or family membe to mimic more traffic.*
 
 Then have a look at the graph:
 
@@ -2434,6 +2444,7 @@ resource "azuread_user" "my_azuread_user" {
 ```tf
 output "my_azuread_user_complete_details" {
   value = azuread_user.my_azuread_user
+  sensitive = true
 }
 ```
 
@@ -2572,7 +2583,7 @@ rm terraform.tfstate terraform.tfstate.backup
 ls -la
 ```
 
-*(In the Azure Portal — **Storage accounts → stdevappsbackend... → Containers → tfstate**)*
+*(In the Azure Portal — **Storage accounts → stdevappsbackend... → Data storage → Containers → tfstate**)*
 
 There's a blob named exactly what you set as `key`. Open it — it's your Known State.
 
