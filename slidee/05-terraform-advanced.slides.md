@@ -30,6 +30,10 @@
 
 ---
 
+<img src="./images/05-terraform-advanced/terraform-vm-resource-graph-named.png">
+
+---
+
 <img src="./images/05-terraform-advanced/terraform-exercise-vm.png">
 
 ---

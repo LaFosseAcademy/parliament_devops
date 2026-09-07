@@ -1131,7 +1131,20 @@ That **the file has to exist on whatever machine runs Terraform.** Your laptop h
 
 **`os_disk { }`** — the managed disk. `caching = "ReadWrite"` is a performance setting; `storage_account_type = "Standard_LRS"` is HDD-backed locally-redundant storage. Cheap, fine for training.
 
-**`source_image_reference { }`** — the four parts of the `urn` from `config.md`, split into named attributes. `"latest"` is an alias Azure resolves at apply time.
+**`source_image_reference { }`** — the four parts of the `urn` (Uniform Resource Name) from `config.md`, split into named attributes. `"latest"` is an alias Azure resolves at apply time.
+
+
+Let's put all that together really quickly.
+
+- `SLIDE ACROSS`
+
+So the **yellow** resource is the **public ip** we created. That connects to our **green** **network interface**. As well as our **pink** **security group**.
+
+So now our **green, network interface card** understands an IP address it has, the subnet it belongs to which allows it to create an IP address in the right range and also a security group policy to determine what traffic is allowed in.
+
+Finally we created the virtual machine we inherts the public ip address, securty rules and the subnet. 
+
+We can if we wanted give our virtual machine several public ips but we wouldn't be able to give several virtual machines the same network interface card if only one public ip connects to it. 
 
 Now apply:
 
