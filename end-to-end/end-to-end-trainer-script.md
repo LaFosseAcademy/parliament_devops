@@ -590,7 +590,9 @@ docker exec jenkins terraform version
 docker exec jenkins docker --version
 ```
 
-**END OF NOTE**
+This verification step is the highest-value thirty seconds of the session. **Enforce it.** Every `command not found` in the next two hours traces back to here, and it's far cheaper to catch now than inside a build log. <br>
+
+# EXPLAIN MORE DETAIL & HOW DONE IN REAL LIFE
 
 **ASK** *(while the build runs)* <br>
 We mounted `/var/run/docker.sock` into the container. What does that actually let Jenkins do? <br>
@@ -599,9 +601,6 @@ Talk to **your machine's** Docker daemon. So when the pipeline runs `docker buil
 There's no Docker *running* inside the Jenkins container — only the client. The socket is the pipe to the real thing. <br>
 It's also a large amount of trust. Anything that can reach that socket can start a privileged container and own your machine. Fine on a laptop; a genuine security decision on a shared server.
 
-**NOTE FOR TRAINERS** <br>
-The verification step is the highest-value thirty seconds of the session. **Enforce it.** Every `command not found` in the next two hours traces back to here, and it's far cheaper to catch now than inside a build log. <br>
-**END OF NOTE**
 
 ### Store the credentials
 
@@ -620,11 +619,11 @@ The verification step is the highest-value thirty seconds of the session. **Enfo
 **ASK** <br>
 Why is Docker Hub a Username-with-password but Azure is four separate Secret texts? <br>
 **ANSWER** <br>
-Because `credentials()` behaves differently per type. A **Secret text** injects one string into one variable. A **Username with password** injects *three* — `$VAR`, `$VAR_USR` and `$VAR_PSW`. <br>
+It's due to how we'll access them in the pipeline, we'll access them through `credentials()`, a method and **username-with-password** behaves differently to **secret text**. A **Secret text** injects one string into one variable. A **Username with password** injects *three* — `$VAR`, `$VAR_USR` and `$VAR_PSW`. <br>
 Terraform's provider wants four discrete values, so four Secret texts maps cleanly. Docker genuinely wants a username **and** a password as a pair, so there the combined type is right.
 
 **ASK** <br>
-And why not just write them into the `Jenkinsfile`? It's our repo. <br>
+And why not just write them into the `Jenkinsfile`, after all it's our repo. <br>
 **ANSWER** <br>
 Because the `Jenkinsfile` is **committed, and Git history is permanent.** Deleting the line tomorrow doesn't remove it from history. <br>
 A cloud credential with Contributor rights in a repository is a security incident, not an untidiness problem. The credential store also **masks these in build logs automatically** — an accidental `echo` prints `****`.
