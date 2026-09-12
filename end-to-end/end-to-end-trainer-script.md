@@ -653,6 +653,9 @@ pipeline {
 
 ### The filled-in version
 
+# MAYBE UPDATED CHECKOUT STAGE TO ECHO PROPER MESSAGE NOT JUST MVC
+# WHERE DOES 'DOCKER_PASS' and 'DOCKER_USER' COME FROM
+
 ```groovy
 pipeline {
     agent any
@@ -713,6 +716,8 @@ pipeline {
 ```
 
 **Replace `yourname`** with your Docker Hub username.
+
+# END OF READING
 
 **Notice the `Docker Login` stub disappeared.** Logging in isn't really a stage — it's something the push stage needs, scoped tightly around it with `withCredentials`. Separating them would mean the credential was in scope for longer than necessary.
 
