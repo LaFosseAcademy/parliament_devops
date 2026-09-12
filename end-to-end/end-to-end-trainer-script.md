@@ -501,6 +501,7 @@ That's after the break. For now it only has to start, because what we build next
 
 If `curl` fails here, **stop and fix it** before we go near Jenkins. A pipeline that ships a broken app is far harder to debug than an app that's broken on your desk. <br>
 
+- *RUN `docker compose down`*
 
 ---
 ---
@@ -512,7 +513,7 @@ If `curl` fails here, **stop and fix it** before we go near Jenkins. A pipeline 
 Jenkins runs in a container. But there's a problem.
 
 **ASK** <br>
-Our pipeline needs `docker build` and `terraform plan`. The official `jenkins/jenkins` image has neither. What happens when a stage calls them? <br>
+Our pipeline needs capability for `docker build` and `terraform plan`. The official `jenkins/jenkins` image has neither. What happens when a stage calls them? <br>
 **ANSWER** <br>
 `docker: not found`, a non-zero exit code, a red stage. Which is **correct behaviour** — the pipeline failed honestly. <br>
 But it means our first job is building a Jenkins that has the tools it's meant to orchestrate. Obvious in hindsight, invisible until it bites.
@@ -552,10 +553,12 @@ Every line is Docker you already have.
 **ASK** <br>
 Why `&&` chaining inside one `RUN`, rather than six separate `RUN` lines? <br>
 **ANSWER** <br>
-Because **each `RUN` is a layer, and layers are additive.** Deleting a file in a later layer doesn't reclaim the space from an earlier one — it just hides it. <br>
+Because **each `RUN` is a layer, and layers are additive.** So deleting a file in a later layer doesn't reclaim the space from an earlier one — it just hides it. <br>
 So `apt-get update` in one layer and `rm -rf /var/lib/apt/lists/*` in another leaves the package index in the image anyway. Chaining puts the download and the cleanup in the same layer, so the cleanup actually shrinks the result.
 
 ### HANDS ON (25 min)
+
+# CONTINUE
 
 *(Run from `~/planetary-app/jenkins-image`)*
 ```bash
