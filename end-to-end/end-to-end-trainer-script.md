@@ -55,7 +55,19 @@ The script calls `gh repo create`. If `gh` isn't installed, or the student isn't
 
 ## 00:00–00:10 — Kickoff
 
-Morning. Three hours, and by the end you'll have an application running on a virtual machine in Azure that you never once logged into, built by a pipeline you never once triggered by hand.
+### Pre Delete
+- Azure:
+  - SSH Keys
+  - EntraId Service Principal Apps
+  - `~/azure` directory
+- Docker:
+  - (All images, containers, volumes)
+  - Personal Access Token
+- Repo planetary-app if exists
+- Check your GitHub Username and Docker username are the same
+
+
+Morning. Three hours, and by the end you'll have an application running on a virtual machine in Azure that you never once logged into, built by a pipeline you never once triggered by hand. That's the plan. 
 
 Here's the shape of it.
 
@@ -76,17 +88,17 @@ git push ──▶ Jenkins ──▶ build two images
 
 **First — we build it in layers, and get it green at every layer.** The script you're about to run generates a `Jenkinsfile` with four empty stages in it. We fill them in one at a time. You'll have a pipeline that genuinely builds and publishes images about an hour from now, long before we touch Azure.
 
-That's not caution for your benefit — it's how you'd do it at work. A pipeline with five stages added one at a time is trivially debuggable. Five stages written at once and pushed is forty minutes of guessing which one broke.
+That's not caution for your benefit — it's how you'd do it at work. A pipeline with five stages added one at a time is debuggable. Five stages written at once and pushed is forty minutes of guessing which one broke.
 
 **Second — the app starts generic and becomes specific.** The script takes a resource name as an argument. Run it with `books Book` and you'd get a books API. What comes out is a correct skeleton with two example rows in the database and a model that knows nothing about anything. We'll turn it into planets after the break.
 
 **ASK** <br>
-Before we start — what's the first thing you should get working? <br>
+Should we try and get the application working in the cloud or locally firsT?? <br>
 **ANSWER** <br>
-**One thing, locally, end to end.** Not the pipeline, not Azure. A container on your own machine that responds to a request. <br>
+**Locally** Not the pipeline or Azure. We'll start with a container on our own machines that responds to a request. <br>
 The most reliable way to lose a session like this is debugging something in the cloud that was never working on your laptop. Every layer you add — a second container, a registry, a pipeline, a VM — is another place the failure could be. **Start with zero layers and add one at a time.**
 
-Right. Before the script, permissions — because the script itself needs some.
+Right. Before we do that though... let's think wholistically about what we're going to try and do and the permissions we'll need. 
 
 ---
 ---
@@ -99,9 +111,9 @@ We need four credentials today. I want to do the **why** first, in broad strokes
 
 ### Three different jobs, three different identities
 
-**Something is going to push Docker images.** Today that's the script first, then Jenkins. Docker Hub needs to know it's us.
+**Something is going to push Docker images.** Today that's the script first, then Jenkins. Docker Hub needs to know it's us. So we need credentials for Docker. 
 
-**Something is going to create infrastructure in Azure.** That's Terraform, running inside Jenkins. Azure needs to know it's us.
+**Something is going to create infrastructure in Azure.** That's Terraform, running inside Jenkins. Azure needs to know it's us. Think about how we can authenticate ourselves there. 
 
 **We'll want to log into the virtual machine afterwards to see what happened.** That's a different thing entirely — that's **you personally**, not a pipeline. So we need an SSH key.
 
@@ -113,21 +125,19 @@ Three machines and one human, and **none of them uses your password.**
 Why not? It would be simpler — we already have passwords. <br>
 **ANSWER** <br>
 Four reasons, and they compound: <br>
-**It works headlessly.** There's no browser for an interactive login and no human at 3am to approve an MFA prompt. <br>
+**It works headlessly.** There's no browser for an interactive login and no human at 3am to approve an Multi Factor Authentication prompt. <br>
 **It's scoped.** A token that can push to one registry can't read your email. <br>
 **It's revocable independently.** If Jenkins is compromised you kill one credential rather than changing your password and locking yourself out of everything. <br>
-**It's attributable.** When something creates a resource at 2am, you can tell whether it was a person or a pipeline.
+**It's attributable.** By which I mean, when something creates a resource at 2am, you can tell whether it was a person or a pipeline.
 
-**ASK** <br>
-Where have you seen this principle already on this course? <br>
-**ANSWER** <br>
-**The Service Principal in the Azure session.** Same reasoning exactly — today is where a machine genuinely uses it for the first time. <br>
-The pattern is worth naming, because you'll meet it again with a different mechanism every time: **automation gets its own identity, never a human's.**
+
+We've seen this before regarding **the Service Principal in the Azure session.** Same reasoning exactly — today is where a machine genuinely uses it for the first time. <br>
+
 
 ### Why an SSH key, specifically
 
 **ASK** <br>
-Azure would happily let us set a password on that VM. Why insist on a key pair? <br>
+Azure would let us set a password on a VM. Why insist on a key pair? <br>
 **ANSWER** <br>
 A password can be guessed, and a public SSH port gets probed by bots within minutes of existing. A key can't realistically be brute-forced. <br>
 But the more interesting reason is the **asymmetry**. There are two halves: <br>
@@ -140,10 +150,20 @@ So you can hand the public half to Azure, to a colleague, to a repository, with 
 **1. Docker Hub access token** *(6 min)*
 
 *(In your browser — [hub.docker.com](https://hub.docker.com))*
-- **Account Settings → Security → New Access Token**
+- **Account Settings → Personal Access Token → Generate Access Token**
 - Description: `planetary-app`
-- Permissions: **Read & Write**
+- Permissions: **Read, Write & Delete**
 - **Generate**, then **copy it now** — it's shown once
+
+I'm going to create a folder: `~/Desktop/planetary-app`
+
+- *(Run from `~/Desktop/planetary-app`: `touch credentials.md`)* <br>
+I'll paste the password into there. 
+
+**credentials.md**
+```md
+Docker PAT - <personal-access-token>
+```
 
 *(Run from anywhere)*
 ```bash
@@ -153,13 +173,21 @@ Paste the token as the password.
 
 **2. GitHub CLI** *(3 min)*
 
+Let's authenticate ourselves to GitHub via the CLI.
+
 ```bash
 gh auth login
 ```
-Choose **GitHub.com → HTTPS → authenticate with a browser**, and follow the prompts.
+Choose **GitHub.com → HTTPS → Yes → Login with a browser**, and follow the prompts.
 
 ```bash
 gh auth status
+```
+
+**credentials.md**
+```md
+Docker PAT - <personal-access-token>
+GH CLI Authorised
 ```
 
 **3. An SSH key pair** *(8 min)*
@@ -171,7 +199,18 @@ gh auth status
 - **Generate new key pair** → **Review + create** → **Create**
 - Your browser downloads `default-vm-ssh.pem`
 
-*(Run from `~/Downloads`)*
+- *Download it to `~/Desktop/planetary-app`
+
+*(Run from `~/Desktop/planetary-app`)* <br>
+- `ls -l`
+
+**ASK** <br>
+I only need permission to read this key to, how do I check what permissions I currently have? <br>
+**ANSWER** <br>
+`ls -l`
+
+
+*(Run from `~/Desktop/planetary-app`)*
 ```bash
 mkdir -p ~/azure/azure_ssh_keys
 chmod 400 default-vm-ssh.pem
@@ -179,10 +218,19 @@ ls -l default-vm-ssh.pem
 mv default-vm-ssh.pem ~/azure/azure_ssh_keys/
 ```
 
+We've only been given the private, which is what stays with us. We need to generate a public key which gets added to the Virtual Machines as we create them. 
+
 *(Run from `~/azure/azure_ssh_keys`)*
 ```bash
 ssh-keygen -y -f default-vm-ssh.pem > default-vm-ssh.pub
 ls -l
+```
+
+**credentials.md**
+```md
+Docker PAT - <personal-access-token>
+GH CLI Authorised
+Public & Private Key Created
 ```
 
 **4. A Service Principal** *(8 min)*
@@ -190,6 +238,13 @@ ls -l
 ```bash
 az login
 az account show --query id -o tsv
+```
+**credentials.md**
+```md
+Docker PAT - <personal-access-token>
+GH CLI Authorised
+Public & Private Key Created
+Azure Subscription ID - <subscription-id>
 ```
 
 ```bash
@@ -201,23 +256,22 @@ az ad sp create-for-rbac \
 
 **Keep the output open.** The password is shown once.
 
-**END OF NOTE**
-
-**NOTE FOR TRAINERS** <br>
-`chmod 400` deserves thirty seconds. Read-only, owner only — `-r--------`. **SSH refuses to use a key other users could read.** <br>
-The error it gives is `Permission denied (publickey)`, which sounds like the *server* rejected you. It didn't — your own client refused to offer the key. That misdirection wastes more student time than almost anything else today, and naming it now saves you answering it four times later. <br>
-**END OF NOTE**
-
-**ASK** *(while they work)* <br>
-Azure gave you only the private key. Where did the public one come from? <br>
-**ANSWER** <br>
-`ssh-keygen -y` **derived** it. That's the direction the maths works — public from private, never the reverse. <br>
-Which is also why losing the private key means losing access entirely. You can't reconstruct it from the public half.
+**credentials.md**
+```md
+Docker PAT - <personal-access-token>
+GH CLI Authorised
+Public & Private Key Created
+Azure Subscription ID - <subscription-id>
+Azure SP: appId - <app-id>
+Azure SP: displayName - <display-name>
+Azure SP: password - <password>
+Azure SP: tenant - <tenant>
+```
 
 **ASK** <br>
 `--role "Contributor"`. Why not `Owner`? <br>
 **ANSWER** <br>
-`Contributor` can create and delete resources. **`Owner` can additionally grant permissions to others** — so a compromised pipeline could mint new identities and persist after you'd locked it out. <br>
+`Contributor` can create and delete resources. **`Owner` can additionally grant permissions to others** — so a compromised pipeline could create new identities and persist after you'd locked it out. <br>
 Least privilege: what the job needs and nothing more. We're also scoping to one subscription rather than the whole tenant.
 
 ---
@@ -227,40 +281,26 @@ Least privilege: what the job needs and nothing more. We're also scoping to one 
 
 *(Activity: 25 min)*
 
-Back in the bash session you wrote a script that scaffolds an application. This is a grown-up version of it, and it does considerably more than yours did.
+Back in the bash session we wrote a script that scaffolds an application. This is a grown-up version of it, and it does a little more than ours did before.
 
 I want you to **read it properly before you run it**, because everything in it is something you'll recognise — and the parts you recognise are the parts you'll be modifying all afternoon.
 
+I'm going to share the script with you over Slack. 
+
 ### Make it executable
 
-*(Run from `~/`)*
-```bash
-mkdir -p ~/planetary-app && cd ~/planetary-app
-cp ~/path/to/scaffold .
-```
+*(Run from `~/bin`)*
+- `touch scaffold-extended`
+- `chmod 700 scaffold-extended`
+- Copy script inside
+- Make it executable from anywhere
+  - `export PATH="$HOME/bin:$PATH"`
 
-*(Run from `~/planetary-app`)*
-```bash
-ls -l scaffold
-chmod +x scaffold
-ls -l scaffold
-```
 
-**ASK** <br>
-Run `ls -l` before and after. What exactly changed? <br>
-**ANSWER** <br>
-Three characters appeared — `x` in the owner, group and others positions. `-rw-r--r--` became `-rwxr-xr-x`. <br>
-**The file didn't change. The permission did.** A script is just a text file; `chmod +x` tells the operating system it's allowed to be *executed* rather than merely read.
-
-**ASK** <br>
-And why `./scaffold` rather than just `scaffold`? <br>
-**ANSWER** <br>
-Because a bare command name makes bash search the folders on your `PATH` — and **your current folder isn't on it**. `./` means "the file is right here". <br>
-That's deliberate, and it's a security feature. If the current directory were on the `PATH`, dropping a file called `ls` into a folder would hijack the real one for anyone who cd'd in.
 
 ### HANDS ON (10 min) — read it
 
-**Read the whole script. Don't run it yet.** In pairs, find and be able to point at:
+**Read the whole script. Don't run it yet.** I'd like you to be able to find and point out:
 
 1. How many **arguments** it takes, and what happens if you leave one out
 2. The line that makes `$2` **optional**, and what it defaults to
@@ -271,10 +311,6 @@ That's deliberate, and it's a security feature. If the current directory were on
 
 **END OF NOTE**
 
-**NOTE FOR TRAINERS** <br>
-Ten minutes of reading feels long and is worth it. They wrote most of these constructs, but in pieces — this is the first time they've read them as a whole thing that does a job end to end. <br>
-Point 6 matters most. Collect the unknowns on a whiteboard and answer them as a room; it's usually two or three things and takes four minutes. <br>
-**END OF NOTE**
 
 ### Talking through what they found
 
@@ -292,11 +328,6 @@ username="$3"
 Two things at once. `${2:-something}` means **"use `$2`, but if it's missing, use `something` instead"**. And `${resource^}` **capitalises the first letter**. <br>
 So `scaffold planets` gives you a model called `Planets`, while `scaffold planets Planet` gives you exactly `Planet`. It's a default parameter, like you'd write in a JavaScript function.
 
-**ASK** <br>
-Why does the model need to be a separate argument at all? Why not derive it? <br>
-**ANSWER** <br>
-Because English plurals are a nightmare. `planets` → `Planet` is easy; `people` → `Person`, `cacti` → `Cactus`, `data` → `Datum` are not. <br>
-**Rather than guess badly, it asks.** That's a reasonable design decision and worth noticing — the script does the tedious part and leaves the judgement to a human.
 
 **The guard clauses:**
 
@@ -310,7 +341,7 @@ fi
 **ASK** <br>
 Why `>&2` rather than plain `echo`? <br>
 **ANSWER** <br>
-Every program has **two** output channels — `1` for results and `2` for complaints. `>&2` sends the usage message to standard error. <br>
+Every program has **two** output channels — `1` for results and `2` for complaints. `>&2` sends the  message to standard error. <br>
 That matters the moment something consumes your output. `./scaffold > files.txt` shouldn't put an error message in `files.txt`. And a pipeline can tell them apart.
 
 **ASK** <br>
@@ -348,15 +379,22 @@ Why build everything twice? <br>
 So the script builds a native pair for local use and an `amd64` pair for the cloud. Only the cloud ones get pushed, because those are the ones that need to run somewhere else. <br>
 **If you're on an Intel Mac or Windows, the first two builds are redundant** — comment them out and save yourself a couple of minutes.
 
-**NOTE FOR TRAINERS** <br>
-This is the single most time-wasting bug available today, so flag it hard and flag it now. It builds, it pushes, it pulls, and **nothing fails until the container tries to start** — hours later, in a different place, with an error mentioning neither Docker nor architecture. <br>
-**END OF NOTE**
+
+- Run: `uname -m` to find out. 
+
 
 ### HANDS ON (15 min) — run it
 
-*(Run from `~/planetary-app`)*
+*(Run from `~/Desktop/planetary-app`)*
 ```bash
-./scaffold planets Planet <your-dockerhub-username>
+mkdir backend
+```
+
+I'm doing this because our script will create and push a repo and I want to keep our credentials outside of that. 
+
+
+```bash
+scaffold-extended planets Planet <your-dockerhub-username>
 ```
 
 **Your Docker Hub username and your GitHub username must be the same**, because the script uses the third argument for both. If they differ, run it with your GitHub name and re-tag the images afterwards.
@@ -399,27 +437,53 @@ You should have this:
 
 Plus a **GitHub repository already created and pushed**, and **two images already on Docker Hub**.
 
-**ASK** <br>
-Look at `db/Dockerfile`. It copies the SQL file into `/docker-entrypoint-initdb.d/`. Why there specifically? <br>
-**ANSWER** <br>
-Because the official Postgres image runs **anything** in that folder on first startup. It's a convention the image author built in. <br>
+
+Look at `db/Dockerfile`. It copies the SQL file into `/docker-entrypoint-initdb.d/`. That's because the official Postgres image runs **anything** in that folder on first startup. It's a convention the image author built in. <br>
 Which means your database image isn't just Postgres — it's **Postgres with your schema already in it**. That's a deliberate choice, and it's why we can deploy a database with no separate setup step later.
 
-**ASK** <br>
-Now look at `docker-compose.yml`. It references `image:` and not `build:`. What does that tell you about when it's meant to be used? <br>
-**ANSWER** <br>
-It's written for **deployment, not development**. It pulls finished images from Docker Hub rather than building from source. <br>
+
+Now look at `docker-compose.yml`. It references `image:` and not `build:`. That tells us it's written for **deployment, not development**. It pulls finished images from Docker Hub rather than building from source. <br>
 Which means it works on a machine that has **no source code on it at all** — which is exactly the machine we're going to create in Azure. The script wrote a deployment file before we had anywhere to deploy to.
 
-**ASK** <br>
-And the `Jenkinsfile`? <br>
-**ANSWER** <br>
-Four stages that each `echo` a string and do nothing. **It's a stub** — the shape of the pipeline with the work left out. <br>
+
+The **Jenkinsfile** has four stages that each `echo` a string and do nothing. **It's a stub** — the shape of the pipeline with the work left out. <br>
 That's what we're filling in, one stage at a time, and it's why we'll have something green within the hour.
 
 ### Prove it locally
 
-*(Run from `~/planetary-app`)*
+Let us run the application locally to make sure everything behaving itself. 
+
+In the **docker-compose.yml** I'm going to remove the `-cloud` section on both images. Those images as we saw in the script was built for **amd architecture** which the cloud has but my laptop does not. 
+
+**docker-compose.yml**
+```yml
+
+services:
+  planets-mvc:
+    # UPDATED
+    image: emilesherrott/planets-mvc:latest
+    ports:
+      - "80:80"
+    restart: always
+    depends_on:
+      - planets-db
+    networks:
+      - planets-network
+
+  planets-db:
+    # UPDATED
+    image: emilesherrott/planets-db:latest
+    ports:
+      - "5432:5432"
+    restart: always
+    networks:
+      - planets-network
+
+networks:
+  planets-network:
+```
+
+*(Run from `~/planetary-app/backend`)*
 ```bash
 docker compose up -d
 docker ps
@@ -435,10 +499,8 @@ What did you get? <br>
 **That's the generic skeleton.** The plumbing is correct — Express is routing, the controller is calling the model, the model is querying Postgres, and the two containers are talking to each other over a Docker network. **It just doesn't mean anything yet.** <br>
 That's after the break. For now it only has to start, because what we build next is the machinery that ships it.
 
-**NOTE FOR TRAINERS** <br>
-If `curl` fails here, **stop and fix it** before anyone goes near Jenkins. A pipeline that ships a broken app is far harder to debug than an app that's broken on your desk. <br>
-Common cause: the `docker-compose.yml` pulls `*-cloud:latest` images, which on Apple Silicon are **amd64**. Docker Desktop will emulate them, slowly, and it usually works — but if it doesn't, temporarily point compose at the native tags (`planets-db:latest`, `planets-mvc:latest`). <br>
-**END OF NOTE**
+If `curl` fails here, **stop and fix it** before we go near Jenkins. A pipeline that ships a broken app is far harder to debug than an app that's broken on your desk. <br>
+
 
 ---
 ---
