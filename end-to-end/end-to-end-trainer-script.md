@@ -63,8 +63,10 @@ The script calls `gh repo create`. If `gh` isn't installed, or the student isn't
 - Docker:
   - (All images, containers, volumes)
   - Personal Access Token
+  - Images on DockerHub
 - Repo planetary-app if exists
 - Check your GitHub Username and Docker username are the same
+
 
 
 Morning. Three hours, and by the end you'll have an application running on a virtual machine in Azure that you never once logged into, built by a pipeline you never once triggered by hand. That's the plan. 
@@ -592,14 +594,15 @@ docker exec jenkins docker --version
 
 This verification step is the highest-value thirty seconds of the session. **Enforce it.** Every `command not found` in the next two hours traces back to here, and it's far cheaper to catch now than inside a build log. <br>
 
-# EXPLAIN MORE DETAIL & HOW DONE IN REAL LIFE
+What we need to understand is Jenkins doesn't have Docker, it borrows our machines. 
 
-**ASK** *(while the build runs)* <br>
-We mounted `/var/run/docker.sock` into the container. What does that actually let Jenkins do? <br>
-**ANSWER** <br>
-Talk to **your machine's** Docker daemon. So when the pipeline runs `docker build`, the image is built by your Docker and appears in your `docker images`. <br>
-There's no Docker *running* inside the Jenkins container — only the client. The socket is the pipe to the real thing. <br>
-It's also a large amount of trust. Anything that can reach that socket can start a privileged container and own your machine. Fine on a laptop; a genuine security decision on a shared server.
+So when the pipeline runs `docker build`, what's happening internally from the pipeline is, the docker in the Jenkins essentially calls the **docker engine** on our laptopl which does the actual work. 
+
+When we run: `docker images` after a few pipleine runs we'll see we've got all the images as well. 
+
+The pipeline container being able to phone our actual machine can be a security risk though.
+
+For our machine it doesn't really matter but if we had Jenkins running on a big machine, an on-premise server that's giving a large amount of trust. Anything the pipeline can do, and remember we could have 10 developers all able to to edit a Jenkinsfile because it's in version control. They all have access through Docker to the server. 
 
 
 ### Store the credentials
@@ -653,9 +656,6 @@ pipeline {
 
 ### The filled-in version
 
-# MAYBE UPDATED CHECKOUT STAGE TO ECHO PROPER MESSAGE NOT JUST MVC
-# WHERE DOES 'DOCKER_PASS' and 'DOCKER_USER' COME FROM
-
 ```groovy
 pipeline {
     agent any
@@ -670,7 +670,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                echo "Building ${IMAGE_NAME_MVC}:${IMAGE_TAG}"
+                echo "Building yourname planets microservices"
             }
         }
 
@@ -717,7 +717,8 @@ pipeline {
 
 **Replace `yourname`** with your Docker Hub username.
 
-# END OF READING
+When we say `withCredentials` for our Docker Username and Password. Jenkins understands the name of our credentials: `dockerhub-credentials`. It provides the two keys to extract values against: `usernameVariable` and `passwordVariable` and we choose whatever to assign against the key which we use later on in the script. 
+
 
 **Notice the `Docker Login` stub disappeared.** Logging in isn't really a stage — it's something the push stage needs, scoped tightly around it with `withCredentials`. Separating them would mean the credential was in scope for longer than necessary.
 
@@ -734,7 +735,7 @@ pipeline {
 *(Run from `~/planetary-app`)*
 ```bash
 git add Jenkinsfile
-git commit -m "Pipeline v1: build and push"
+git commit -m "Add Pipeline v1: build and push"
 git push origin main
 ```
 
@@ -742,14 +743,13 @@ git push origin main
 1. **New Item** → `planetary-app-pipeline` → **Pipeline** → **OK**
 2. **Pipeline** → **Definition**: `Pipeline script from SCM`
 3. **SCM**: `Git`, your repo URL, **Branch**: `*/main`, **Script Path**: `Jenkinsfile`
-4. **Build Triggers** → tick **Poll SCM** → `H/2 * * * *`
+4. **Build Triggers** → tick **Poll SCM** → `H/2 * * * *` (meaning every 2 minutes)
 5. **Save** → **Build Now**
 
 Then check [hub.docker.com](https://hub.docker.com) — both images should have a new tag, numbered `1`.
 
-**END OF NOTE**
 
-**That's your first green build.** Not a toy one — it genuinely rebuilt and republished your application.
+**That's hopefully your first green build.** Not a toy one — it genuinely rebuilt and republished your application.
 
 **ASK** <br>
 The script already pushed those images half an hour ago. So what's different now? <br>
@@ -762,11 +762,7 @@ That's the difference between a script and automation.
 Poll SCM checks every two minutes. Why not a webhook, which would be instant? <br>
 **ANSWER** <br>
 Because GitHub is on the public internet and your Jenkins is on `localhost`. **There's no route for GitHub to reach you.** <br>
-A webhook is what you'd use for real, and you could get there today with a tunnel like ngrok. Polling demonstrates the identical principle with no networking involved.
 
-**NOTE FOR TRAINERS** <br>
-**Make them push a change and wait**, rather than clicking Build Now again. A build starting on its own, two minutes after a `git push`, is the moment the session lands for most people. Worth the two minutes of apparent nothing. <br>
-**END OF NOTE**
 
 ---
 ---
@@ -837,16 +833,11 @@ class Planet {
 module.exports = Planet;
 ```
 
-**ASK** <br>
-Look at `server/db/connect.js` — every value reads an environment variable. Why not just hardcode them? <br>
-**ANSWER** <br>
-Because **the same image has to run in two different places.** Locally the database is a container called `planets-db`; in a different environment it might be a managed Postgres with a completely different hostname. <br>
-Hardcode it and you need two images for two environments — which means **the thing you tested isn't the thing you shipped.** <br>
-**Build once, configure at run time.** Same argument as Terraform variables, one layer up.
+
 
 ### HANDS ON (20 min)
 
-*(Run from `~/planetary-app`)*
+*(Run from `~/planetary-app/backend`)*
 ```bash
 docker compose down -v
 docker compose up -d --build
@@ -863,7 +854,6 @@ git commit -m "Make it a planets API"
 git push origin main
 ```
 
-**END OF NOTE**
 
 **ASK** *(when the build goes green)* <br>
 You changed the application substantially. How many changes did the pipeline need? <br>
@@ -873,6 +863,8 @@ That separation is worth a moment: **the pipeline cares about *how* you ship, no
 
 ---
 ---
+
+# CONTINUE
 
 ## 02:25–02:45 — Pipeline v2: somewhere to keep state
 

@@ -61,6 +61,8 @@ cat > docker-compose.yml << EOF
 services:
   ${resource}-mvc:
     image: ${username}/${resource}-mvc-cloud:latest
+    build:
+      context: ./server
     ports:
       - "80:80"
     restart: always
@@ -72,6 +74,8 @@ services:
   # The value of 'DB_HOST' we reference in the MVC Dockerfile  
   ${resource}-db:
     image: ${username}/${resource}-db-cloud:latest
+    build:
+      context: ./db
     ports:
       - "5432:5432"
     restart: always
