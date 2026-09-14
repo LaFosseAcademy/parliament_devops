@@ -864,7 +864,6 @@ That separation is worth a moment: **the pipeline cares about *how* you ship, no
 ---
 ---
 
-# CONTINUE
 
 ## 02:25–02:45 — Pipeline v2: somewhere to keep state
 
@@ -876,7 +875,7 @@ Time to fill in that fourth stub. Before we can, there's a problem to solve.
 Your Terraform state has been a local file all course. A Jenkins build runs in a fresh workspace that's thrown away afterwards. What happens the first time that pipeline runs `terraform apply`? <br>
 **ANSWER** <br>
 **Disaster.** The build starts with **no state at all**, so Terraform believes nothing exists and plans to create everything — duplicating resources or erroring on name collisions. Then the workspace is destroyed and whatever state it wrote vanishes, so the **next** build starts from nothing again. <br>
-**Remote state isn't a nice-to-have for pipeline Terraform. It's a hard prerequisite.**
+**Remote state isn't a nice-to-have for a Terraform pipeline. It's a neccessity.**
 
 So we create a storage account to hold it. And there's a chicken-and-egg: the storage account holding your state can't be stored in that storage account. So this project keeps **local** state, is created once by hand, and then left alone.
 
@@ -913,11 +912,10 @@ resource "azurerm_storage_container" "tfstate" {
 The resource group is `rg-tfstate-planetary-app` — deliberately different from the one our app will use. Why? <br>
 **ANSWER** <br>
 Two reasons. <br>
-**Different lifecycles.** The backend is created once and never touched; the app changes constantly. <br>
+**Different lifecycles.** The backend is created once and never touched; the app infrastructure changes constantly. <br>
 **Blast radius.** `terraform destroy` on the app must not be able to delete the storage account holding its own state. <br>
 And a practical one: if two Terraform projects both declare a resource group with the same name, each has its own state, **neither knows about the other**, and you get a very confusing `already exists` error.
 
-### HANDS ON (20 min)
 
 *(Run from `~/planetary-app/terraform/backend`)*
 ```bash
@@ -936,19 +934,15 @@ Then look at what you just created:
 grep -i key terraform.tfstate
 ```
 
-**END OF NOTE**
+
+We find our **storage account access keys**, `primary_access_key` in plaintext. Unencrypted, in a file people commit by accident every day. <br>
+The script's `.gitignore` already covers `*.tfstate` — go and confirm it. That's not tidiness, it's the reason the container is `private` too. **State files aren't just metadata; they contain real secrets.**
 
 **ASK** <br>
-What did you find? <br>
-**ANSWER** <br>
-Your **storage account access keys**, in plaintext. Unencrypted, in a file people commit by accident every day. <br>
-The script's `.gitignore` already covers `*.tfstate` — go and confirm it. That's not tidiness, it's the reason the container is `private` too. **State files aren't metadata; they contain real secrets.**
-
-**ASK** <br>
-Those four `ARM_` names — did I make them up? <br>
+Those four `ARM_` environment variables — did I make them up? <br>
 **ANSWER** <br>
 No. The `azurerm` provider looks for **exactly** those names automatically. You never mention them in a `.tf` file. <br>
-Which is why in a minute, putting them in the Jenkins `environment` block is all it takes. **We're inventing nothing** — Jenkins will do for a machine exactly what you just did with `export`.
+Which is why in a minute, putting them in the Jenkins `environment` block is all it takes. **We're inventing nothing** — Jenkins will apply them for our pipeline agent exactly what we just did with `export`.
 
 ---
 ---
@@ -961,25 +955,216 @@ The script gave you six empty `.tf` files in `terraform/infrastructure/`. **I'm 
 
 *(Full contents in the accompanying student walkthrough: `main.tf`, `network-card.tf`, `network-security-group.tf`, `variables.tf`, `data-providers.tf`, `outputs.tf`.)*
 
+**main.tf** <br>
+**FILL IN INITIALS**
+```tf
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }
+  }
+
+  backend "azurerm" {
+  resource_group_name  = "rg-tfstate-planetary-app"
+  storage_account_name = "stplanets<your-initials>"
+  container_name       = "tfstate"
+  key = "prod/infrastructure/backend-state.tfstate"
+  }
+}
+
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "vm_resource_group" {
+  name     = "rg-final-project-planetary-app"
+  location = "swedencentral"
+}
+```
+
+**network-security-groups.tf**
+```tf
+resource "azurerm_network_security_group" "http_server_nsg" {
+  name                = "http-server-nsg"
+  location            = azurerm_resource_group.vm_resource_group.location
+  resource_group_name = azurerm_resource_group.vm_resource_group.name
+  tags = {
+    name = "http-server-nsg"
+  }
+}
+
+resource "azurerm_network_security_rule" "http_ingress" {
+  name                        = "AllowHTTP"
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "80"
+  source_address_prefix       = "0.0.0.0/0"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.vm_resource_group.name
+  network_security_group_name = azurerm_network_security_group.http_server_nsg.name
+}
+
+resource "azurerm_network_security_rule" "ssh_ingress" {
+  name                        = "AllowSSH"
+  priority                    = 110
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefix       = "0.0.0.0/0"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.vm_resource_group.name
+  network_security_group_name = azurerm_network_security_group.http_server_nsg.name
+}
+```
+
+**network-card.tf**
+```tf
+resource "azurerm_virtual_network" "vm_vnet" {
+  name                = "vnet-emilesherrott-devops"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.vm_resource_group.location
+  resource_group_name = azurerm_resource_group.vm_resource_group.name
+}
+
+resource "azurerm_subnet" "public_subnets" {
+  name                 = "subnet-public"
+  resource_group_name  = azurerm_resource_group.vm_resource_group.name
+  virtual_network_name = azurerm_virtual_network.vm_vnet.name
+  address_prefixes     = ["10.0.0.0/24"]
+}
+
+
+
+resource "azurerm_public_ip" "http_server_pip" {
+  name                = "pip-http-server"
+  location            = azurerm_resource_group.vm_resource_group.location
+  resource_group_name = azurerm_resource_group.vm_resource_group.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
+resource "azurerm_network_interface" "http_server_nic" {
+  name                = "nic-http-server"
+  location            = azurerm_resource_group.vm_resource_group.location
+  resource_group_name = azurerm_resource_group.vm_resource_group.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.public_subnets.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.http_server_pip.id
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "http_server_nic_nsg" {
+  network_interface_id      = azurerm_network_interface.http_server_nic.id
+  network_security_group_id = azurerm_network_security_group.http_server_nsg.id
+}
+```
+
+**variables.tf**
+```tf
+variable "azure_ssh_public_key" {
+  default = "keys/default-vm-ssh.pub"
+}
+```
+
+**data-providers.tf**
+```tf
+data "azurerm_platform_image" "ubuntu_latest" {
+  location  = azurerm_resource_group.vm_resource_group.location
+  publisher = "Canonical"
+  offer     = "ubuntu-24_04-lts"
+  sku       = "server"
+}
+```
+
+**outputs.tf**
+```tf
+output "public_ip_address" {
+  value = azurerm_linux_virtual_machine.http_server.public_ip_address
+}
+```
+
 The one addition:
 
 *(Run from `~/planetary-app/terraform/infrastructure`)*
 ```bash
 mkdir -p keys
 cp ~/azure/azure_ssh_keys/default-vm-ssh.pub keys/
-git check-ignore -v keys/default-vm-ssh.pub
 ```
 
-**No output from that last command is what you want** — it means the file is tracked.
+Now I can define the Virtual Machine HTTP Server
+
+**main.tf** <br>
+**ADD BELOW**
+```tf
+[ . . . ]
+
+resource "azurerm_linux_virtual_machine" "http_server" {
+  name                  = "http-server"
+  resource_group_name   = azurerm_resource_group.vm_resource_group.name
+  location              = azurerm_resource_group.vm_resource_group.location
+  size                  = "Standard_B2als_v2"
+  admin_username        = "azureuser"
+  network_interface_ids = [azurerm_network_interface.http_server_nic.id]
+
+  admin_ssh_key {
+    username   = "azureuser"
+    public_key = file(var.azure_ssh_public_key)
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "ubuntu-24_04-lts"
+    sku       = "server"
+    version   = data.azurerm_platform_image.ubuntu_latest.version
+  }
+
+  connection {
+    type        = "ssh"
+    host        = azurerm_public_ip.http_server_pip.ip_address
+    user        = "azureuser"
+    private_key = file(var.azure_ssh_private_key)
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo apt-get update -y",
+    ]
+  }
+}
+```
+
+# NOTE REVIST
+
+Notice we don't have our private key. Previously we added this to a **connection** block which worked in conjunction with our **provisioner** block to bootstrap our Virtual Machine with some commands. <br>
+
+We'll be handling this process slightly differently this time. 
 
 **ASK** <br>
-We're committing an SSH key to a public repository. Is that alright? <br>
+We're also committing an SSH key to a public repository. Is that alright? <br>
 **ANSWER** <br>
-Yes — because it's the **public** half. It's designed to be published; that's the entire point of asymmetric cryptography. <br>
-Committing it means the pipeline has it automatically, with no credential to manage. **The private key never goes near the repo.**
+Yes — because it's the **public** half. It's designed to be published; that's the  point of asymmetric cryptography. <br>
+Committing it means the pipeline has it automatically, with no credential to manage. **The private key wouldn't go near the repo.**
 
 ### Replace the Terraform stub
 
+# EXPLAIN SOME OF THIS CONFIG
+
+**Jenkinsfile**
 ```groovy
         stage('Terraform Init') {
             steps {
@@ -1012,23 +1197,14 @@ And add the four Azure credentials to `environment`:
 
 **Push it, and get a green plan before adding apply.**
 
-**`terraform init -reconfigure`** — a Jenkins workspace persists between builds and can hold a cached copy of a previous backend configuration. If that changes, Terraform stops and asks whether you meant to migrate state or start fresh, and **a pipeline can't answer a question**. `-reconfigure` makes init deterministic.
+**`terraform init -reconfigure`** — a Jenkins workspace persists between builds and can hold a cached copy of a previous backend configuration. If that changes, Terraform stops and asks whether you meant to migrate state or start fresh, and **a pipeline can't answer a question**. `-reconfigure` makes init always apply the new configuration.
 
-**ASK** <br>
-`terraform plan -out=tfplan` saves the plan to a file. Why not just let `apply` re-plan? <br>
-**ANSWER** <br>
-Because then `apply` **replays a decision already made**, rather than making a new one. Nothing can drift between what a human reviewed and what actually executes. <br>
-That's the entire point of the two-stage split, and it's what makes the approval gate meaningful rather than theatre.
+**`terraform show -no-color tfplan > tfplan.txt`** converts the binary plan to readable text. **`archiveArtifacts`** attaches it permanently to the build — so six months from now you can answer *"what exactly did we change on 16 September?"*, **an audit trail the Azure Activity Log can't give you.**
 
-**`terraform show -no-color tfplan > tfplan.txt`** converts the binary plan to readable text. **`archiveArtifacts`** attaches it permanently to the build — so six months from now you can answer *"what exactly did we change on 14 March?"*, **an audit trail the Azure Activity Log can't give you.**
-
-**NOTE FOR TRAINERS** <br>
-`archiveArtifacts` **must be inside `steps`**. A `stage` can only contain declarative directives — `agent`, `when`, `environment`, `options`, `post`, `steps`. Anything that *does work* goes in `steps`. <br>
-Put it outside and you get `Unknown stage section "archiveArtifacts"`, reported against the line where the **stage opens**, not where the mistake is. Mention it pre-emptively; several will hit it. <br>
-**END OF NOTE**
 
 ### Now the apply
 
+**Jenkinsfile**
 ```groovy
         stage('Terraform Apply') {
             steps {
@@ -1049,7 +1225,7 @@ Put it outside and you get `Unknown stage section "archiveArtifacts"`, reported 
 **ANSWER** <br>
 Because **infrastructure changes can be destructive and irreversible** in a way application deploys usually aren't. You've seen `must be replaced` in plan output — on a storage account holding data, that's catastrophic. <br>
 A human reading the actual plan immediately before it executes is a cheap, valuable safety net, **especially while a team is still building trust in a new pipeline.** <br>
-Fully unattended apply is common and legitimate. But it should be **a deliberate decision to remove the gate**, not something that happened by default.
+A fully unattended apply is common and legitimate. But it should be **a deliberate decision to remove the gate**, not something that happened by default.
 
 **ASK** <br>
 So when would you remove it? <br>
@@ -1058,13 +1234,12 @@ So when would you remove it? <br>
 The gate belongs where a human is actually exercising judgement, and only there.
 
 **ASK** <br>
-And `-auto-approve` — that's the third time on this course we've removed an interactive prompt. Where were the others? <br>
+And `-auto-approve` — that's the second time on this course we've removed an interactive prompt. Where were the others? <br>
 **ANSWER** <br>
-**`apt-get install -y`** and **`read -p`** in your bash scripts. Same lesson each time: interactive prompts are helpful by hand and fatal in automation, because there's nobody there and the job hangs until it times out. <br>
+**`npm init -y`** when creating a Node application. Same lesson each time: interactive prompts are helpful by hand and fatal in automation, because there's nobody there and the job hangs until it times out. <br>
 When you meet a new tool, *"how do I make this non-interactive?"* is one of the first questions worth asking.
 
-**And `timeout` matters more than it looks.** Without it an un-approved build holds a Jenkins executor open indefinitely — and, worse, **holds the Terraform state lock**, blocking everyone else's pipeline. That's Session 5's locking mechanism biting in a way you'd never predict.
-
+**And `timeout` matters more than it looks.** Without it an un-approved build holds a Jenkins executor open indefinitely — and, worse, **holds the Terraform state lock**, blocking everyone else's pipeline.
 ---
 ---
 
@@ -1135,24 +1310,25 @@ Wired in with one line on the VM resource:
   custom_data = base64encode(file("${path.module}/cloud-init.yaml"))
 ```
 
-**`#cloud-config` on line one is required** — without it the file is ignored entirely.
+**`#cloud-config` inside `cloud-init.yaml` on line one is required** — without it the file is ignored entirely.
+
+It's similar to the shebang we've added to our scripts.
 
 **ASK** <br>
 Compare that compose file to the one the script generated in your repo root. What's different? <br>
 **ANSWER** <br>
-**The database publishes no ports.** The script's version maps `5432:5432`, which is convenient locally for connecting a GUI client — and on a public VM would **expose Postgres to the internet**, with a password of `docker` baked into the image. <br>
-The two containers reach each other by service name over the shared network. **They never needed the published port; you did.**
+**The database publishes no ports.** The script's version maps `5432:5432`, which is convenient locally for connecting a GUI client. So we could interact with the DB similar to how you did with **superbase**<br>
+The two containers reach each other by service name over the shared network. **They never needed the published port; we did in development.**
 
 **ASK** <br>
-So what does the pipeline now need the private SSH key for? <br>
+Does the pipeline now need the private SSH key? <br>
 **ANSWER** <br>
 **Nothing.** That's the whole win. <br>
 The **public** key still goes on the VM so *you* can log in and debug. But Terraform never opens an SSH session, so it never needs the private half. No secret file in Jenkins, no `chmod`, no firewall rule for the agent. <br>
 Which means you can lock port 22 down to your own IP, because the only thing that needs it is you.
 
-**One honest trade-off.** cloud-init runs **asynchronously after boot**, so Terraform reports the VM created and moves on while apt is still installing Docker. There's a two-to-four minute window where the machine exists but the app isn't up. `remote-exec` blocked until it finished, which is the one thing it was better at.
+**One honest trade-off.** cloud-init runs **asynchronously after boot**, so Terraform reports the VM created and moves on while apt is still installing Docker. There's a two-to-four minute window where the machine exists but the app isn't up. `remote-exec` blocked the `terraform apply` from finishing, which is the one thing it was better at.
 
-### HANDS ON (20 min)
 
 ```bash
 git add .
@@ -1162,10 +1338,6 @@ git push origin main
 
 Watch the build. When it pauses at **Terraform Apply**, **read the plan**, then click Apply.
 
-*(Run from `~/planetary-app/terraform/infrastructure`)*
-```bash
-terraform output public_ip
-```
 
 **Wait two to four minutes**, then visit `http://<public-ip>/planets`.
 
@@ -1176,6 +1348,35 @@ cloud-init status
 sudo cat /var/log/cloud-init-output.log
 docker ps
 ```
+
+### Private SSH connection
+
+That's pretty much it. We spoke before about how anyone can attempt to SSH into our VM. We can change that. 
+
+- `curl -4 ifconfig.me`
+
+That should return our **Public IP** then we need to take that value and insert it into. 
+
+**`terraform/infrastructure/network-security-group.tf`**
+
+```tf
+resource "azurerm_network_security_rule" "ssh_ingress" {
+  name                        = "AllowSSH"
+  priority                    = 110
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  # UPDATE
+  source_address_prefix       = "<HERE>/32"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.vm_resource_group.name
+  network_security_group_name = azurerm_network_security_group.http_server_nsg.name
+}
+```
+
+**`/32`** at the end to limit it only to our IP address. 
 
 **END OF NOTE**
 
