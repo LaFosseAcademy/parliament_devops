@@ -1261,6 +1261,8 @@ HashiCorp themselves call provisioners **"a last resort"**. This is why.
 **So we don't use one.** We hand the VM a configuration document at creation time and let it **build itself on first boot**. Nobody logs in. There's no SSH session. **So there's no private key in the pipeline at all.**
 
 **`terraform/infrastructure/cloud-init.yaml`**
+
+**CHANGE <YOURNAME> FOR IMAGES**
 ```yaml
 #cloud-config
 package_update: true
@@ -1274,7 +1276,7 @@ write_files:
     content: |
       services:
         planets-mvc:
-          image: yourname/planets-mvc-cloud:latest
+          image: <yourname>/planets-mvc-cloud:latest
           ports:
             - "80:80"
           restart: always
@@ -1284,7 +1286,7 @@ write_files:
             - planets-network
 
         planets-db:
-          image: yourname/planets-db-cloud:latest
+          image: <yourname>/planets-db-cloud:latest
           restart: always
           networks:
             - planets-network
