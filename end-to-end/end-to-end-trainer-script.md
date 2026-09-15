@@ -192,11 +192,6 @@ Choose **GitHub.com → HTTPS → Yes → Login with a browser**, and follow the
 gh auth status
 ```
 
-**credentials.md**
-```md
-Docker PAT - <personal-access-token>
-GH CLI Authorised
-```
 
 **3. An SSH key pair** *(8 min)*
 
@@ -232,12 +227,6 @@ ssh-keygen -y -f default-vm-ssh.pem > default-vm-ssh.pub
 ls -l
 ```
 
-**credentials.md**
-```md
-Docker PAT - <personal-access-token>
-GH CLI Authorised
-Public & Private Key Created
-```
 
 **4. A Service Principal** *(8 min)*
 
@@ -248,8 +237,6 @@ az account show --query id -o tsv
 **credentials.md**
 ```md
 Docker PAT - <personal-access-token>
-GH CLI Authorised
-Public & Private Key Created
 Azure Subscription ID - <subscription-id>
 ```
 
@@ -265,8 +252,6 @@ az ad sp create-for-rbac \
 **credentials.md**
 ```md
 Docker PAT - <personal-access-token>
-GH CLI Authorised
-Public & Private Key Created
 Azure Subscription ID - <subscription-id>
 Azure SP AppID - <app-id>
 Azure SP Password - <password>
@@ -748,7 +733,7 @@ git push origin main
 1. **New Item** → `planetary-app-pipeline` → **Pipeline** → **OK**
 2. **Pipeline** → **Definition**: `Pipeline script from SCM`
 3. **SCM**: `Git`, your repo URL, **Branch**: `*/main`, **Script Path**: `Jenkinsfile`
-4. **Build Triggers** → tick **Poll SCM** → `H/2 * * * *` (meaning every 2 minutes)
+4. Triggers: `H/2 * * * *`
 5. **Save** → **Build Now**
 
 Then check [hub.docker.com](https://hub.docker.com) — both images should have a new tag, numbered `1`.
