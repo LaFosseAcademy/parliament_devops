@@ -59,19 +59,25 @@ The script calls `gh repo create`. If `gh` isn't installed, or the student isn't
 - Azure:
   - SSH Keys
   - EntraId Service Principal Apps
-  - `~/azure` directory
+  - Azure Resource Groups
+  - `~/azure/azure-ssh-keys` directory
 - Docker:
-  - (All images, containers, volumes)
+  - Relevant images, containers, volumes
   - Personal Access Token
-  - Images on DockerHub
-- Repo planetary-app if exists
-- Check your GitHub Username and Docker username are the same
+  - Pre-existing conflicting Images on DockerHub
+- Pre-existing conflicting repolanetary-app if exists
+- Check your GitHub Username and Docker username are the same. The script doesn't differntiate between the two. 
+- Delete directory `~/Desktop/planetary-app`
+- Delete contents of `~/bin`
 
 
 
 Morning. Three hours, and by the end you'll have an application running on a virtual machine in Azure that you never once logged into, built by a pipeline you never once triggered by hand. That's the plan. 
 
+- `SLIDE ACROSS`
+
 Here's the shape of it.
+
 
 ```
 git push ──▶ Jenkins ──▶ build two images
@@ -115,7 +121,7 @@ We need four credentials today. I want to do the **why** first, in broad strokes
 
 **Something is going to push Docker images.** Today that's the script first, then Jenkins. Docker Hub needs to know it's us. So we need credentials for Docker. 
 
-**Something is going to create infrastructure in Azure.** That's Terraform, running inside Jenkins. Azure needs to know it's us. Think about how we can authenticate ourselves there. 
+**Something is also going to create infrastructure in Azure.** That's Terraform, running inside Jenkins. Azure needs to know it's us. Think about how we can authenticate ourselves there. 
 
 **We'll want to log into the virtual machine afterwards to see what happened.** That's a different thing entirely — that's **you personally**, not a pipeline. So we need an SSH key.
 
@@ -203,8 +209,6 @@ GH CLI Authorised
 
 - *Download it to `~/Desktop/planetary-app`
 
-*(Run from `~/Desktop/planetary-app`)* <br>
-- `ls -l`
 
 **ASK** <br>
 I only need permission to read this key to, how do I check what permissions I currently have? <br>
@@ -264,10 +268,9 @@ Docker PAT - <personal-access-token>
 GH CLI Authorised
 Public & Private Key Created
 Azure Subscription ID - <subscription-id>
-Azure SP: appId - <app-id>
-Azure SP: displayName - <display-name>
-Azure SP: password - <password>
-Azure SP: tenant - <tenant>
+Azure SP AppID - <app-id>
+Azure SP Password - <password>
+Azure SP Tenant - <tenant>
 ```
 
 **ASK** <br>
@@ -285,15 +288,16 @@ Least privilege: what the job needs and nothing more. We're also scoping to one 
 
 Back in the bash session we wrote a script that scaffolds an application. This is a grown-up version of it, and it does a little more than ours did before.
 
+I'm going to share the script with you over Slack. 
+
 I want you to **read it properly before you run it**, because everything in it is something you'll recognise — and the parts you recognise are the parts you'll be modifying all afternoon.
 
-I'm going to share the script with you over Slack. 
 
 ### Make it executable
 
 *(Run from `~/bin`)*
-- `touch scaffold-extended`
-- `chmod 700 scaffold-extended`
+- `touch scaffold`
+- `chmod 700 scaffold`
 - Copy script inside
 - Make it executable from anywhere
   - `export PATH="$HOME/bin:$PATH"`
@@ -396,7 +400,7 @@ I'm doing this because our script will create and push a repo and I want to keep
 
 
 ```bash
-scaffold-extended planets Planet <your-dockerhub-username>
+scaffold planets Planet <your-github-username>
 ```
 
 **Your Docker Hub username and your GitHub username must be the same**, because the script uses the third argument for both. If they differ, run it with your GitHub name and re-tag the images afterwards.
@@ -439,6 +443,8 @@ You should have this:
 
 Plus a **GitHub repository already created and pushed**, and **two images already on Docker Hub**.
 
+
+- *OPEN IN VSCode FROM `~/desktop/planetary-app`*
 
 Look at `db/Dockerfile`. It copies the SQL file into `/docker-entrypoint-initdb.d/`. That's because the official Postgres image runs **anything** in that folder on first startup. It's a convention the image author built in. <br>
 Which means your database image isn't just Postgres — it's **Postgres with your schema already in it**. That's a deliberate choice, and it's why we can deploy a database with no separate setup step later.
@@ -560,7 +566,6 @@ So `apt-get update` in one layer and `rm -rf /var/lib/apt/lists/*` in another le
 
 ### HANDS ON (25 min)
 
-# CONTINUE
 
 *(Run from `~/planetary-app/jenkins-image`)*
 ```bash
@@ -583,7 +588,7 @@ docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 *(In your browser — `http://localhost:8080`)*
 - Paste the password
 - **Install suggested plugins**
-- Create your admin user — **write it down**
+- Create your admin user — **write it down if you're likely to forget**
 
 **Then verify. Nobody moves on until both of these respond:**
 
@@ -592,7 +597,7 @@ docker exec jenkins terraform version
 docker exec jenkins docker --version
 ```
 
-This verification step is the highest-value thirty seconds of the session. **Enforce it.** Every `command not found` in the next two hours traces back to here, and it's far cheaper to catch now than inside a build log. <br>
+This verification step is the highest-value thirty seconds of the session. Every `command not found` in the next two hours traces back to here, and it's far cheaper to catch now than inside a build log. <br>
 
 What we need to understand is Jenkins doesn't have Docker, it borrows our machines. 
 
@@ -613,7 +618,7 @@ For our machine it doesn't really matter but if we had Jenkins running on a big 
 |---|---|---|
 | Username with password | `dockerhub-credentials` | your Docker Hub **username** + the token |
 | Secret text | `azure-client-id` | the `appId` |
-| Secret text | `azure-client-secret` | the `password` |
+| Secret text | `azure-client-secret` | the `password` **NOT INSIDE SINGLE QUOTES HERE** |
 | Secret text | `azure-tenant-id` | the `tenant` |
 | Secret text | `azure-subscription-id` | from `az account show --query id -o tsv` |
 
@@ -732,7 +737,7 @@ When we say `withCredentials` for our Docker Username and Password. Jenkins unde
 
 ### HANDS ON (25 min)
 
-*(Run from `~/planetary-app`)*
+*(Run from `~/planetary-ap/backend`)*
 ```bash
 git add Jenkinsfile
 git commit -m "Add Pipeline v1: build and push"
@@ -852,6 +857,7 @@ Then push it and **watch the pipeline run on its own**:
 git add .
 git commit -m "Make it a planets API"
 git push origin main
+docker compose down -v
 ```
 
 
@@ -939,7 +945,7 @@ We find our **storage account access keys**, `primary_access_key` in plaintext. 
 The script's `.gitignore` already covers `*.tfstate` — go and confirm it. That's not tidiness, it's the reason the container is `private` too. **State files aren't just metadata; they contain real secrets.**
 
 **ASK** <br>
-Those four `ARM_` environment variables — did I make them up? <br>
+Those four `ARM_` environment variable names — did I make them up? <br>
 **ANSWER** <br>
 No. The `azurerm` provider looks for **exactly** those names automatically. You never mention them in a `.tf` file. <br>
 Which is why in a minute, putting them in the Jenkins `environment` block is all it takes. **We're inventing nothing** — Jenkins will apply them for our pipeline agent exactly what we just did with `export`.
@@ -1132,23 +1138,10 @@ resource "azurerm_linux_virtual_machine" "http_server" {
     sku       = "server"
     version   = data.azurerm_platform_image.ubuntu_latest.version
   }
-
-  connection {
-    type        = "ssh"
-    host        = azurerm_public_ip.http_server_pip.ip_address
-    user        = "azureuser"
-    private_key = file(var.azure_ssh_private_key)
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo apt-get update -y",
-    ]
-  }
 }
 ```
 
-# NOTE REVIST
+
 
 Notice we don't have our private key. Previously we added this to a **connection** block which worked in conjunction with our **provisioner** block to bootstrap our Virtual Machine with some commands. <br>
 
@@ -1162,7 +1155,6 @@ Committing it means the pipeline has it automatically, with no credential to man
 
 ### Replace the Terraform stub
 
-# EXPLAIN SOME OF THIS CONFIG
 
 **Jenkinsfile**
 ```groovy
@@ -1197,9 +1189,11 @@ And add the four Azure credentials to `environment`:
 
 **Push it, and get a green plan before adding apply.**
 
-**`terraform init -reconfigure`** — a Jenkins workspace persists between builds and can hold a cached copy of a previous backend configuration. If that changes, Terraform stops and asks whether you meant to migrate state or start fresh, and **a pipeline can't answer a question**. `-reconfigure` makes init always apply the new configuration.
+**`terraform init -reconfigure`** — a Jenkins workspace persists between builds and can hold a cached copy of a previous backend configuration. If that changes, Terraform stops and asks whether you meant to migrate state or start a new backend setup, and **a pipeline can't answer a question**. `-reconfigure` makes init always apply the new configuration.
 
 **`terraform show -no-color tfplan > tfplan.txt`** converts the binary plan to readable text. **`archiveArtifacts`** attaches it permanently to the build — so six months from now you can answer *"what exactly did we change on 16 September?"*, **an audit trail the Azure Activity Log can't give you.**
+
+**`archiveArtiefacts`** basically tells Jenkins to save `tfplan.txt` as a build artifact after the pipeline runs. The `fingerprint: true` basically tells Jenkins to create a hash for the file which we can then use to track exactly where the file was produced. So instead of having 20 builds and 20 **tfplan.txt** files we can now which build product the artifact.
 
 
 ### Now the apply
@@ -1262,7 +1256,8 @@ HashiCorp themselves call provisioners **"a last resort"**. This is why.
 
 **`terraform/infrastructure/cloud-init.yaml`**
 
-**CHANGE <YOURNAME> FOR IMAGES**
+**CHANGE <YOURNAME> FOR IMAGES** <br>
+**REMEMBER TO INCLIDE `#cloud-config`** <br>
 ```yaml
 #cloud-config
 package_update: true
